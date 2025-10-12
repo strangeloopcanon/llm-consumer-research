@@ -1,0 +1,25 @@
+# Python / build
+__pycache__/
+*.py[cod]
+*.so
+
+# Virtual environments
+.venv/
+.venv311/
+env/
+venv/
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+
+# Data / caches
+*.log
+*.tmp
+
+# Environment files
+.env
+
+# OS
+.DS_Store

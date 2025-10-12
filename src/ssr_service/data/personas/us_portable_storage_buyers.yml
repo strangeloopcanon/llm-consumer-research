@@ -1,0 +1,32 @@
+group: us_portable_storage_buyers
+description: Internet subscription types from ACS 2022 1-year (B28002). Shares normalized
+  across unique subscription statuses.
+source: https://api.census.gov/data/2022/acs/acs1
+personas:
+- name: Mobile-First Households
+  age: 18-64
+  gender: mixed
+  region: US
+  income: Varied
+  descriptors:
+  - cell data only
+  - stream on mobile
+  weight: 0.4971
+- name: Broadband Power Users
+  age: 25-64
+  gender: mixed
+  region: US
+  income: Middle-upper
+  descriptors:
+  - cable/fiber broadband only
+  - heavy file usage
+  weight: 0.2184
+- name: Offline Households
+  age: 35+
+  gender: mixed
+  region: US
+  income: Varied
+  descriptors:
+  - no internet access
+  - rely on physical backups
+  weight: 0.2845

@@ -1,0 +1,28 @@
+version: 1
+intent: purchase_intent
+locale: en-US
+description: >-
+  Likert anchors for purchase intent, covering ratings 1-5 with multiple
+  phrasings to reduce lexical bias.
+anchor_sets:
+  - id: base_v1
+    anchors:
+      1: "I definitely would not buy this product."
+      2: "I probably would not buy this product."
+      3: "I might or might not buy this product."
+      4: "I probably would buy this product."
+      5: "I definitely would buy this product."
+  - id: practical_v1
+    anchors:
+      1: "This is not something I would consider purchasing at all."
+      2: "I doubt I would purchase this unless something changed."
+      3: "I'm on the fence about purchasing this."
+      4: "I'd be inclined to give this product a try."
+      5: "I'd go out of my way to buy this product."
+  - id: shopper_v1
+    anchors:
+      1: "It would never make it into my shopping cart."
+      2: "I'd usually pass on it if I saw it in store."
+      3: "I'd have to think carefully before buying it."
+      4: "I'd likely pick it up when I see it."
+      5: "I'd plan to buy it whenever it's available."

@@ -1,0 +1,40 @@
+group: us_toothpaste_buyers
+description: Age distribution of US population 18+ from ACS 2022 1-year (Table B01001).
+source: https://api.census.gov/data/2022/acs/acs1
+personas:
+- name: Young Adults 18-24
+  age: 18-24
+  gender: mixed
+  region: US
+  income: Varied
+  descriptors:
+  - high social media usage
+  - building oral care habits
+  weight: 0.1198
+- name: Prime Working Age 25-44
+  age: 25-44
+  gender: mixed
+  region: US
+  income: Middle
+  descriptors:
+  - busy professionals
+  - family-focused
+  weight: 0.3421
+- name: Midlife Households 45-64
+  age: 45-64
+  gender: mixed
+  region: US
+  income: Middle-upper
+  descriptors:
+  - established routines
+  - value preventive care
+  weight: 0.3165
+- name: Older Adults 65+
+  age: 65+
+  gender: mixed
+  region: US
+  income: Fixed income
+  descriptors:
+  - sensitive teeth
+  - brand loyal
+  weight: 0.2216

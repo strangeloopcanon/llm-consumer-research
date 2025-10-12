@@ -1,0 +1,34 @@
+group: us_backpack_buyers
+description: College enrollment from ACS 2022 1-year (B14004) and household income
+  for age 25-44 from ACS 2022 1-year (B19037). Shares normalized across segments.
+source: https://api.census.gov/data/2022/acs/acs1
+personas:
+- name: Campus Commuters
+  age: 18-24
+  gender: mixed
+  region: US
+  income: Student budget
+  descriptors:
+  - enrolled in college
+  - carry laptops daily
+  weight: 0.2864
+- name: Outdoor Weekenders
+  age: 25-44
+  gender: mixed
+  region: US
+  income: $50k-$99k
+  descriptors:
+  - householders 25-44
+  - middle income
+  - active lifestyles
+  weight: 0.3093
+- name: Minimalist Professionals
+  age: 25-44
+  gender: mixed
+  region: US
+  income: $100k+
+  descriptors:
+  - householders 25-44
+  - urban professionals
+  - premium gear seekers
+  weight: 0.4043
