@@ -64,7 +64,9 @@ def load_anchor_bank(path: Path) -> AnchorBank:
         if set(anchor_set.anchors.keys()) != first_keys:
             raise ValueError("Anchor sets must share identical rating keys")
 
-    return AnchorBank(version=version, intent=intent, locale=locale, anchor_sets=anchor_sets)
+    return AnchorBank(
+        version=version, intent=intent, locale=locale, anchor_sets=anchor_sets
+    )
 
 
 __all__ = ["AnchorBank", "AnchorSet", "load_anchor_bank"]

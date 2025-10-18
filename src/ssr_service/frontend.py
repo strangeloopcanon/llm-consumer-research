@@ -6,20 +6,21 @@ import asyncio
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+import altair as alt
 import gradio as gr
+import pandas as pd
 
 from .config import get_settings
 from .models import ConceptInput, SimulationOptions, SimulationRequest
 from .orchestrator import run_simulation
 from .personas import load_library
-from .sample_data import get_sample_ids, load_sample, default_sample
-
+from .sample_data import default_sample, get_sample_ids, load_sample
 
 SETTINGS = get_settings()
 PERSONA_LIBRARY = load_library(Path(SETTINGS.persona_library_path))
 
 
-def _read_file(file_obj) -> Optional[str]:  # type: ignore[no-untyped-def]
+def _read_file(file_obj: Optional[gr.File]) -> Optional[str]:
     if file_obj is None:
         return None
     content = file_obj.read()
@@ -28,7 +29,7 @@ def _read_file(file_obj) -> Optional[str]:  # type: ignore[no-untyped-def]
     return str(content)
 
 
-def _make_markdown(response) -> str:
+def _make_markdown(response: SimulationResponse) -> str:
     aggregate = response.aggregate
     md_lines = [
         "### Aggregate Results",
@@ -48,9 +49,12 @@ def _make_markdown(response) -> str:
     for persona_result in response.personas:
         persona = persona_result.persona
         dist = persona_result.distribution
-        md_lines.append(f"**{persona.name}** (weight: {persona.weight:.0%}, n={dist.sample_n})")
         md_lines.append(
-            f"- Mean: {dist.mean:.2f}, Top-2: {dist.top2box:.2%}, Themes: {', '.join(persona_result.themes) or 'n/a'}"
+            f"**{persona.name}** (weight: {persona.weight:.0%}, n={dist.sample_n})"
+        )
+        themes = ", ".join(persona_result.themes) or "n/a"
+        md_lines.append(
+            f"- Mean: {dist.mean:.2f}, Top-2: {dist.top2box:.2%}, Themes: {themes}"
         )
         bullets = persona_result.rationales[:2]
         if bullets:
@@ -62,7 +66,7 @@ def _make_markdown(response) -> str:
     return "\n".join(md_lines)
 
 
-def _persona_table(response) -> List[List[Any]]:
+def _persona_table(response: SimulationResponse) -> List[List[Any]]:
     rows: List[List[Any]] = []
     for persona_result in response.personas:
         persona = persona_result.persona
@@ -83,11 +87,35 @@ def _persona_table(response) -> List[List[Any]]:
     return rows
 
 
-def _metadata(response) -> Dict[str, str]:
+def _metadata(response: SimulationResponse) -> Dict[str, str]:
     return response.metadata
 
 
-def simulate(
+def _plot_distribution(response: SimulationResponse) -> alt.Chart:
+    """Create a layered bar and text chart of the aggregate distribution."""
+    df = pd.DataFrame(
+        {
+            "rating": response.aggregate.ratings,
+            "probability": response.aggregate.pmf,
+        }
+    )
+    chart = (
+        alt.Chart(df)
+        .mark_bar()
+        .encode(
+            x=alt.X("rating:O", title="Likert Rating"),
+            y=alt.Y("probability:Q", title="Probability", axis=alt.Axis(format="%")),
+        )
+    )
+    text = chart.mark_text(
+        align="center",
+        baseline="bottom",
+        dy=-3,  # Nudges text up so it doesn't overlap with the bar
+    ).encode(text=alt.Text("probability:Q", format=".1%"))
+    return (chart + text).properties(title="Aggregate Likert Distribution")
+
+
+async def simulate(
     title: str,
     description: str,
     price: str,
@@ -117,7 +145,9 @@ def simulate(
     )
 
     persona_csv = _read_file(persona_csv_file)
-    persona_group_value = persona_group if persona_group and persona_group != "(None)" else None
+    persona_group_value = (
+        persona_group if persona_group and persona_group != "(None)" else None
+    )
 
     request = SimulationRequest(
         concept=concept,
@@ -128,13 +158,14 @@ def simulate(
         options=options,
     )
 
-    response = asyncio.run(run_simulation(request))
+    response = await run_simulation(request)
 
     markdown = _make_markdown(response)
     table_rows = _persona_table(response)
     metadata = _metadata(response)
+    plot = _plot_distribution(response)
 
-    return markdown, table_rows, metadata
+    return markdown, table_rows, metadata, plot
 
 
 def _load_sample_fields(sample_id: str):
@@ -160,14 +191,18 @@ def launch() -> None:
     default_description = default_scenario.description if default_scenario else ""
     default_price = default_scenario.price if default_scenario else ""
     default_url = default_scenario.source if default_scenario else ""
-    default_persona_group = (
-        default_scenario.persona_group if default_scenario and default_scenario.persona_group in persona_options else "(None)"
-    )
+    default_persona_group = "(None)"
+    if default_scenario and default_scenario.persona_group in persona_options:
+        default_persona_group = default_scenario.persona_group
     default_question = default_scenario.intent_question if default_scenario else ""
     default_sample_id = default_scenario.sample_id if default_scenario else ""
 
     with gr.Blocks(title="SSR Synthetic Consumer Research") as demo:
-        gr.Markdown("""## SSR Synthetic Consumer Research\nProvide a concept and audience to simulate purchase intent responses using GPT-5 and semantic similarity rating.""")
+        gr.Markdown(
+            "## SSR Synthetic Consumer Research\n"
+            "Provide a concept and audience to simulate purchase intent "
+            "responses using GPT-5 and semantic similarity rating."
+        )
 
         sample_dropdown = gr.Dropdown(
             choices=[(title, sid) for sid, title in sample_options.items()],
@@ -237,6 +272,7 @@ def launch() -> None:
         run_button = gr.Button("Run Simulation")
 
         output_markdown = gr.Markdown()
+        output_plot = gr.Plot()
         persona_table = gr.Dataframe(
             headers=[
                 "Persona",
@@ -249,7 +285,17 @@ def launch() -> None:
                 "Top2",
                 "Themes",
             ],
-            datatype=["str", "number", "str", "str", "str", "number", "number", "number", "str"],
+            datatype=[
+                "str",
+                "number",
+                "str",
+                "str",
+                "str",
+                "number",
+                "number",
+                "number",
+                "str",
+            ],
             interactive=False,
         )
         metadata_json = gr.JSON(label="Metadata")
@@ -269,13 +315,20 @@ def launch() -> None:
                 stratified_input,
                 question_input,
             ],
-            outputs=[output_markdown, persona_table, metadata_json],
+            outputs=[output_markdown, persona_table, metadata_json, output_plot],
         )
 
         load_sample_button.click(
             _load_sample_fields,
             inputs=[sample_dropdown],
-            outputs=[title_input, description_input, price_input, url_input, persona_group_input, question_input],
+            outputs=[
+                title_input,
+                description_input,
+                price_input,
+                url_input,
+                persona_group_input,
+                question_input,
+            ],
         )
 
     demo.launch()

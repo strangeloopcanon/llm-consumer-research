@@ -56,7 +56,9 @@ def load_persona_group(path: Path) -> PersonaGroup:
         raise ValueError(f"Persona file {path} contains no personas")
 
     source = raw.get("source")
-    return PersonaGroup(name=group_name, description=description, personas=personas, source=source)
+    return PersonaGroup(
+        name=group_name, description=description, personas=personas, source=source
+    )
 
 
 def load_library(directory: Path) -> Dict[str, PersonaGroup]:
@@ -75,7 +77,9 @@ def get_persona_group(name: str, directory: Path) -> PersonaGroup:
     raise KeyError(f"Persona group '{name}' not found in {directory}")
 
 
-def personas_from_csv(csv_source: Union[Path, str], encoding: str = "utf-8") -> List[PersonaSpec]:
+def personas_from_csv(
+    csv_source: Union[Path, str], encoding: str = "utf-8"
+) -> List[PersonaSpec]:
     personas: List[PersonaSpec] = []
     if isinstance(csv_source, Path):
         fh = csv_source.open("r", encoding=encoding, newline="")

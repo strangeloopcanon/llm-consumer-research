@@ -12,18 +12,18 @@ import numpy as np
 from .config import get_settings
 from .elicitation import ElicitationClient, generate_batch
 from .models import (
+    ConceptInput,
     LikertDistribution,
     PersonaResult,
     PersonaSpec,
-    ConceptInput,
     SimulationOptions,
     SimulationRequest,
     SimulationResponse,
 )
-from .retrieval import ConceptArtifact, ingest_concept
-from .ssr import SemanticSimilarityRater, likert_metrics, load_rater
 from .personas import ensure_weights, get_persona_group, personas_from_csv
+from .retrieval import ConceptArtifact, ingest_concept
 from .sample_data import load_sample
+from .ssr import SemanticSimilarityRater, likert_metrics, load_rater
 
 
 def _default_question(intent: str) -> str:
@@ -50,7 +50,9 @@ def _top_themes(rationales: List[str], limit: int = 3) -> List[str]:
     return [word for word, _ in counts.most_common(limit)]
 
 
-def _bootstrap_ci(measurements: np.ndarray, samples: int = 200, alpha: float = 0.05) -> Tuple[float, float]:
+def _bootstrap_ci(
+    measurements: np.ndarray, samples: int = 200, alpha: float = 0.05
+) -> Tuple[float, float]:
     if measurements.size == 0:
         return (float("nan"), float("nan"))
     rng = np.random.default_rng(42)
@@ -63,7 +65,9 @@ def _bootstrap_ci(measurements: np.ndarray, samples: int = 200, alpha: float = 0
     return lower, upper
 
 
-def _make_distribution(pmf: np.ndarray, ratings: List[int], sample_n: int) -> LikertDistribution:
+def _make_distribution(
+    pmf: np.ndarray, ratings: List[int], sample_n: int
+) -> LikertDistribution:
     mean, top2 = likert_metrics(pmf, ratings)
     return LikertDistribution(
         ratings=ratings,
@@ -109,7 +113,9 @@ async def _simulate_persona(
     )
 
 
-def _allocate_draws(personas: List[PersonaSpec], options: SimulationOptions) -> List[int]:
+def _allocate_draws(
+    personas: List[PersonaSpec], options: SimulationOptions
+) -> List[int]:
     if not personas:
         return []
 
@@ -202,7 +208,9 @@ async def run_simulation(request: SimulationRequest) -> SimulationResponse:
 
     if not personas:
         personas = [
-            PersonaSpec(name="General Consumer", descriptors=["broad audience"], weight=1.0)
+            PersonaSpec(
+                name="General Consumer", descriptors=["broad audience"], weight=1.0
+            )
         ]
 
     personas = ensure_weights(personas)
@@ -228,7 +236,9 @@ async def run_simulation(request: SimulationRequest) -> SimulationResponse:
     aggregate_pmf = np.zeros(len(ratings), dtype=float)
     aggregate_samples = 0
     all_means = []
-    for weight, persona_result, pmfs, draws in zip(weights, persona_results, persona_pmfs, draw_counts):
+    for weight, persona_result, pmfs, draws in zip(
+        weights, persona_results, persona_pmfs, draw_counts
+    ):
         aggregate_pmf += weight * pmfs.mean(axis=0)
         aggregate_samples += draws
         means = pmfs @ np.array(ratings)

@@ -58,8 +58,12 @@ class SimulationRequest(BaseModel):
     concept: ConceptInput
     personas: List[PersonaSpec] = Field(default_factory=list)
     persona_group: Optional[str] = Field(default=None)
-    persona_csv: Optional[str] = Field(default=None, description="Raw CSV string defining personas")
-    sample_id: Optional[str] = Field(default=None, description="Name of built-in sample scenario")
+    persona_csv: Optional[str] = Field(
+        default=None, description="Raw CSV string defining personas"
+    )
+    sample_id: Optional[str] = Field(
+        default=None, description="Name of built-in sample scenario"
+    )
     intent: str = Field(default="purchase_intent")
     intent_question: Optional[str] = None
     options: SimulationOptions = Field(default_factory=SimulationOptions)

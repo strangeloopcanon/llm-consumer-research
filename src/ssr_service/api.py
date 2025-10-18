@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import Depends, FastAPI, HTTPException
 
 from .config import AppSettings, get_settings
@@ -20,8 +22,12 @@ async def health(settings: AppSettings = Depends(get_settings)) -> dict[str, str
 async def simulate(request: SimulationRequest) -> SimulationResponse:
     try:
         return await run_simulation(request)
-    except Exception as exc:  # noqa: BLE001
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    except (ValueError, RuntimeError) as exc:
+        logging.error("Simulation error: %s", exc, exc_info=True)
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        logging.exception("An unexpected error occurred during simulation.")
+        raise HTTPException(status_code=500, detail="Internal server error") from exc
 
 
 __all__ = ["app"]

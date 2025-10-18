@@ -43,7 +43,9 @@ class SemanticSimilarityRater:
         for anchor_set in bank.anchor_sets:
             ordered = [text for _, text in anchor_set.sorted_items()]
             matrix = embed_texts(ordered)
-            embeddings.append(AnchorEmbeddings(anchor_set=anchor_set, embeddings=matrix))
+            embeddings.append(
+                AnchorEmbeddings(anchor_set=anchor_set, embeddings=matrix)
+            )
         return embeddings
 
     def ratings(self) -> List[int]:
@@ -72,14 +74,18 @@ class SemanticSimilarityRater:
 def likert_metrics(pmf: np.ndarray, ratings: Iterable[int]) -> Tuple[float, float]:
     rating_list = list(ratings)
     mean = float(np.dot(pmf, rating_list))
-    top2 = float(sum(p for p, r in zip(pmf, rating_list) if r >= max(rating_list) - 1))
+    top2 = float(
+        sum(p for p, r in zip(pmf, rating_list) if r >= max(rating_list) - 1)
+    )
     return mean, top2
 
 
 def load_rater(anchor_filename: str) -> SemanticSimilarityRater:
     settings = get_settings()
     base = Path(settings.anchor_bank_path)
-    path = anchor_filename if anchor_filename.startswith("/") else base / anchor_filename
+    path = (
+        anchor_filename if anchor_filename.startswith("/") else base / anchor_filename
+    )
     bank = load_anchor_bank(Path(path))
     return SemanticSimilarityRater(bank)
 

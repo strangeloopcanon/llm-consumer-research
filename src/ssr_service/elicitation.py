@@ -50,6 +50,12 @@ class ElicitationClient:
             "Return only the JSON object."
         )
 
+        from .cache import add_to_cache, get_from_cache
+
+        cached_response = get_from_cache(prompt)
+        if cached_response:
+            return ElicitationResult(rationale=cached_response, used_model="cached")
+
         response = await self._client.responses.create(
             model=self._model,
             input=prompt,
@@ -71,6 +77,7 @@ class ElicitationClient:
             except json.JSONDecodeError:
                 rationale = raw_text
 
+        add_to_cache(prompt, rationale)
         return ElicitationResult(rationale=rationale, used_model=response.model)
 
 
@@ -105,7 +112,8 @@ async def generate_batch(
                     results.append(res)
                 except Exception as inner_err:  # noqa: BLE001
                     raise RuntimeError(
-                        f"Failed to elicit rationale for persona {persona.name}: {inner_err}"
+                        "Failed to elicit rationale for persona "
+                        f"{persona.name}: {inner_err}"
                     ) from err
 
     await asyncio.gather(*(run_single(i) for i in range(n)))
