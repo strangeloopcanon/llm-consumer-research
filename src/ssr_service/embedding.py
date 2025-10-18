@@ -6,7 +6,6 @@ from functools import lru_cache
 from typing import Iterable, List
 
 import numpy as np
-
 from openai import OpenAI
 
 from .config import get_settings

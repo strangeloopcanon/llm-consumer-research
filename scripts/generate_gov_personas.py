@@ -1,4 +1,3 @@
-import json
 from pathlib import Path
 from typing import Dict, List
 
@@ -31,8 +30,18 @@ def make_us_toothpaste() -> Dict:
         "B01001_035E", "B01001_036E", "B01001_037E", "B01001_038E",
         "B01001_015E", "B01001_016E", "B01001_017E", "B01001_018E", "B01001_019E",
         "B01001_039E", "B01001_040E", "B01001_041E", "B01001_042E", "B01001_043E",
-        "B01001_020E", "B01001_021E", "B01001_022E", "B01001_023E", "B01001_024E", "B01001_025E",
-        "B01001_044E", "B01001_045E", "B01001_046E", "B01001_047E", "B01001_048E", "B01001_049E",
+        "B01001_020E",
+        "B01001_021E",
+        "B01001_022E",
+        "B01001_023E",
+        "B01001_024E",
+        "B01001_025E",
+        "B01001_044E",
+        "B01001_045E",
+        "B01001_046E",
+        "B01001_047E",
+        "B01001_048E",
+        "B01001_049E",
     ]
     data = fetch_census(vars_needed)
 
@@ -52,10 +61,22 @@ def make_us_toothpaste() -> Dict:
             "B01001_015E", "B01001_016E", "B01001_017E", "B01001_018E", "B01001_019E",
             "B01001_039E", "B01001_040E", "B01001_041E", "B01001_042E", "B01001_043E",
         ]),
-        "65+": total([
-            "B01001_020E", "B01001_021E", "B01001_022E", "B01001_023E", "B01001_024E", "B01001_025E",
-            "B01001_044E", "B01001_045E", "B01001_046E", "B01001_047E", "B01001_048E", "B01001_049E",
-        ]),
+        "65+": total(
+            [
+                "B01001_020E",
+                "B01001_021E",
+                "B01001_022E",
+                "B01001_023E",
+                "B01001_024E",
+                "B01001_025E",
+                "B01001_044E",
+                "B01001_045E",
+                "B01001_046E",
+                "B01001_047E",
+                "B01001_048E",
+                "B01001_049E",
+            ]
+        ),
     }
     total_pop = sum(groups.values())
 
@@ -66,7 +87,10 @@ def make_us_toothpaste() -> Dict:
             "gender": "mixed",
             "region": "US",
             "income": "Varied",
-            "descriptors": ["high social media usage", "building oral care habits"],
+            "descriptors": [
+                "high social media usage",
+                "building oral care habits",
+            ],
             "weight": round(groups["18-24"] / total_pop, 4),
         },
         {
@@ -84,7 +108,10 @@ def make_us_toothpaste() -> Dict:
             "gender": "mixed",
             "region": "US",
             "income": "Middle-upper",
-            "descriptors": ["established routines", "value preventive care"],
+            "descriptors": [
+                "established routines",
+                "value preventive care",
+            ],
             "weight": round(groups["45-64"] / total_pop, 4),
         },
         {
@@ -100,7 +127,9 @@ def make_us_toothpaste() -> Dict:
 
     return {
         "group": "us_toothpaste_buyers",
-        "description": "Age distribution of US population 18+ from ACS 2022 1-year (Table B01001).",
+        "description": (
+            "Age distribution of US population 18+ from ACS 2022 1-year (Table B01001)."
+        ),
         "source": "https://api.census.gov/data/2022/acs/acs1",
         "personas": personas,
     }
@@ -116,7 +145,11 @@ def make_us_backpack() -> Dict:
         "B19037_032E", "B19037_033E", "B19037_034E", "B19037_035E",
     ]
     income_totals = fetch_census(["B19037_019E"] + income_vars)
-    mid_income = income_totals["B19037_029E"] + income_totals["B19037_030E"] + income_totals["B19037_031E"]
+    mid_income = (
+        income_totals["B19037_029E"]
+        + income_totals["B19037_030E"]
+        + income_totals["B19037_031E"]
+    )
     high_income = (
         income_totals["B19037_032E"]
         + income_totals["B19037_033E"]
@@ -147,7 +180,11 @@ def make_us_backpack() -> Dict:
             "gender": "mixed",
             "region": "US",
             "income": "$50k-$99k",
-            "descriptors": ["householders 25-44", "middle income", "active lifestyles"],
+            "descriptors": [
+                "householders 25-44",
+                "middle income",
+                "active lifestyles",
+            ],
             "weight": round(segments["MidIncome"] / total, 4),
         },
         {
@@ -156,7 +193,11 @@ def make_us_backpack() -> Dict:
             "gender": "mixed",
             "region": "US",
             "income": "$100k+",
-            "descriptors": ["householders 25-44", "urban professionals", "premium gear seekers"],
+            "descriptors": [
+                "householders 25-44",
+                "urban professionals",
+                "premium gear seekers",
+            ],
             "weight": round(segments["HighIncome"] / total, 4),
         },
     ]
@@ -164,8 +205,9 @@ def make_us_backpack() -> Dict:
     return {
         "group": "us_backpack_buyers",
         "description": (
-            "College enrollment from ACS 2022 1-year (B14004) and household income for age 25-44 from "
-            "ACS 2022 1-year (B19037). Shares normalized across segments."
+            "College enrollment from ACS 2022 1-year (B14004) and household income "
+            "for age 25-44 from ACS 2022 1-year (B19037). Shares normalized "
+            "across segments."
         ),
         "source": "https://api.census.gov/data/2022/acs/acs1",
         "personas": personas,
@@ -215,7 +257,8 @@ def make_us_portable_storage() -> Dict:
     return {
         "group": "us_portable_storage_buyers",
         "description": (
-            "Internet subscription types from ACS 2022 1-year (B28002). Shares normalized across unique subscription statuses."
+            "Internet subscription types from ACS 2022 1-year (B28002). "
+            "Shares normalized across unique subscription statuses."
         ),
         "source": "https://api.census.gov/data/2022/acs/acs1",
         "personas": personas,

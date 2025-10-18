@@ -33,7 +33,9 @@ def _load_samples() -> Dict[str, SampleScenario]:
         return _SAMPLES_CACHE
 
     settings = get_settings()
-    samples_path = Path(settings.anchor_bank_path).parent / "samples" / "demo_samples.json"
+    samples_path = (
+        Path(settings.anchor_bank_path).parent / "samples" / "demo_samples.json"
+    )
     with samples_path.open("r", encoding="utf-8") as fp:
         data = json.load(fp)
 
