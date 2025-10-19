@@ -1,8 +1,29 @@
 # Synthetic Consumer Research Service
 
-This project implements the semantic similarity rating (SSR) workflow described in *LLMs Reproduce Human Purchase Intent via Semantic Similarity*. It exposes an API that ingests a concept, elicits short rationales from synthetic personas via the OpenAI Responses API (default: `gpt-5`), maps the text to Likert distributions using anchor embeddings, and returns familiar survey metrics plus qualitative snippets.
+Reimagining concept testing for product teams that need insight in minutes, not weeks. This repo is the reference implementation of our synthetic panel: it turns a product idea plus an audience description into survey-quality distributions, qualitative rationale, and diagnostics you can actually ship.
 
-## Quick start
+## Why this exists
+
+- **Traditional consumer research is slow and expensive.** Classic panels need recruiting, incentives, and weeks of field time before you see a histogram. Marketers and PMs often compromise with ad hoc surveys or gut instinct.
+- **LLMs unlock cheap respondents but need discipline.** Asking a model for a Likert score produces confident nonsense unless you constrain context, persona voice, and scoring. We pair models with deterministic anchors so teams can trust the output.
+- **We’re building a new standard for rapid insight.** This project is the baseline service we operate: a monolithic Python app with type-safe interfaces, reproducible anchors, and gates for safety, cost, and observability.
+
+## What you get out of the box
+
+- Weighted Likert distributions (mean, top-2 box, bootstrap CIs) per persona and in aggregate.
+- Concise persona-specific rationales and top recurring themes to understand *why* the score shifted.
+- A FastAPI endpoint, Gradio UI, and CLI hooks that plug into existing research workflows.
+- Typed Pydantic models, deterministic anchor banks, and test suites (unit + LLM golden) to keep changes safe.
+
+## How the engine works
+
+1. **Ingest the concept.** We accept free-text copy or fetch a URL, normalize the payload, and build a prompt block with provenance.
+2. **Elicit synthetic respondents.** For each persona, GPT-5 (Responses API) roleplays realistic rationales with enforced JSON outputs, caching, and retry controls.
+3. **Map rationales to Likert space.** Semantic Similarity Rating (SSR) embeds each rationale against curated anchor banks, averages across variants, and aggregates to personas and overall distributions.
+
+The result is a transparent pipeline: every decision—persona weights, anchors, models, retry budget—is versioned and auditable.
+
+## Run it locally
 
 ```bash
 python3.11 -m venv .venv311
@@ -46,20 +67,18 @@ The response includes:
 - Aggregate distribution weighted by persona weights.
 - Metadata describing the prompt, anchor bank, and bootstrap CIs for the average score.
 
-## Project structure
+## Anatomy of the repo
 
-- `src/ssr_service/anchors.py` – load YAML anchor banks.
-- `src/ssr_service/personas.py` – persona library, CSV ingestion, and weight normalization helpers.
-- `src/ssr_service/embedding.py` – OpenAI embedding helpers for anchors and rationales.
-- `src/ssr_service/elicitation.py` – Responses API client for persona rationales.
-- `src/ssr_service/orchestrator.py` – orchestrates ingestion, elicitation, SSR mapping, aggregation, and bootstrapping.
-- `src/ssr_service/api.py` – FastAPI app exposing `/health` and `/simulate` endpoints.
-- `src/ssr_service/data/anchors/purchase_intent_en.yml` – anchor sets for purchase intent (3 variants).
-- `src/ssr_service/data/personas/us_toothpaste.yml` – ACS-derived age mix for oral care shoppers.
-- `src/ssr_service/data/personas/us_backpack_buyers.yml`, `us_portable_storage_buyers.yml` – additional demo persona packs.
-- `src/ssr_service/data/samples/demo_samples.json` – canned concept copies from FakeStore API for quick testing.
-- `scripts/generate_gov_personas.py` – regenerates persona YAMLs directly from the U.S. Census Bureau 2022 ACS 1-year API.
-- `src/ssr_service/frontend.py` / `gradio_app.py` – Gradio UI for interactive runs.
+- `src/ssr_service/api.py` – FastAPI surface exposing `/health` and `/simulate`.
+- `src/ssr_service/orchestrator.py` – the heart of the pipeline (ingestion → elicitation → SSR → aggregation).
+- `src/ssr_service/elicitation.py` – Responses API client with JSON-mode prompts, caching, and retry guards.
+- `src/ssr_service/ssr.py` / `embedding.py` – anchor management and cosine-similarity mapping for Likert distributions.
+- `src/ssr_service/personas.py` – persona library loader, CSV ingestion, and weight normalization for stratified samples.
+- `src/ssr_service/data/anchors/purchase_intent_en.yml` – versioned anchor banks; extend these to add new intents.
+- `src/ssr_service/data/personas/*.yml` – ACS-derived personas you can override or replace.
+- `src/ssr_service/frontend.py` & `gradio_app.py` – Gradio dashboard for researchers and demo loops.
+- `scripts/generate_gov_personas.py` – reproducible persona regeneration straight from the U.S. Census Bureau ACS API.
+- `tests/` & `tests_llm_live/` – unit tests plus golden-schema validation for live LLM runs.
 
 ## Configuration
 
@@ -128,3 +147,7 @@ The UI lets you:
 - Select per-persona or stratified total sample sizes.
 - Override the intent question.
 - Inspect aggregate metrics, persona breakdowns, and metadata directly in the browser.
+
+## Roadmap highlights
+
+This repo tracks the production roadmap in `plan.md` (ignored by Git for local iteration). Upcoming milestones include richer retrieval (competitors, reviews), persistent storage, cost metering, and multi-provider diagnostics. Contributions that move us toward trustworthy, rapid consumer insight are welcome—open an issue before large architectural changes.
