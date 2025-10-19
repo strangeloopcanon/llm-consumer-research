@@ -1,8 +1,6 @@
 # Synthetic Consumer Research Service
 
-**Tired of waiting weeks for consumer research? This tool gives you survey-quality insights in minutes.**
-
-Imagine you have a new product idea. Instead of spending weeks and thousands of dollars on traditional focus groups, you can use this service to get instant feedback from a "virtual" panel of consumers. This helps you make better decisions, faster.
+Imagine you have a new product idea. Instead of spending weeks and thousands of dollars on traditional focus groups, you can use this tool to get instant feedback from a virtual panel of consumers. This helps you make better decisions, faster.
 
 ## Who is this for?
 
