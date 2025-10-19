@@ -1,6 +1,6 @@
 # Synthetic Consumer Research Service
 
-This project implements the semantic similarity rating (SSR) workflow described in *LLMs Reproduce Human Purchase Intent via Semantic Similarity*. It exposes an API that ingests a concept, elicits short rationales from synthetic personas via the OpenAI Responses API (default: `gpt-5-mini`), maps the text to Likert distributions using anchor embeddings, and returns familiar survey metrics plus qualitative snippets.
+This project implements the semantic similarity rating (SSR) workflow described in *LLMs Reproduce Human Purchase Intent via Semantic Similarity*. It exposes an API that ingests a concept, elicits short rationales from synthetic personas via the OpenAI Responses API (default: `gpt-5`), maps the text to Likert distributions using anchor embeddings, and returns familiar survey metrics plus qualitative snippets.
 
 ## Quick start
 
