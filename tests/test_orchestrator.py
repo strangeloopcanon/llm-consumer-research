@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from ssr_service.orchestrator import _default_question
 
 

@@ -2,9 +2,22 @@
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field, HttpUrl, TypeAdapter, ValidationError
+
+_HTTP_URL_ADAPTER = TypeAdapter(HttpUrl)
+
+
+def coerce_http_url(value: Union[str, HttpUrl, None]) -> Optional[HttpUrl]:
+    if value is None:
+        return None
+    if isinstance(value, HttpUrl):
+        return value
+    try:
+        return _HTTP_URL_ADAPTER.validate_python(value)
+    except ValidationError:
+        return None
 
 
 class PersonaSpec(BaseModel):
@@ -98,4 +111,5 @@ __all__ = [
     "SimulationOptions",
     "SimulationRequest",
     "SimulationResponse",
+    "coerce_http_url",
 ]

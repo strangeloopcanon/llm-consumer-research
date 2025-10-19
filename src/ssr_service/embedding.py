@@ -16,7 +16,8 @@ def _get_client() -> OpenAI:
     settings = get_settings()
     if not settings.openai_api_key:
         raise RuntimeError("OPENAI_API_KEY is not configured")
-    return OpenAI(api_key=settings.openai_api_key, base_url=settings.openai_base_url)
+    base_url = str(settings.openai_base_url) if settings.openai_base_url else None
+    return OpenAI(api_key=settings.openai_api_key, base_url=base_url)
 
 
 def embed_texts(texts: Iterable[str]) -> np.ndarray:

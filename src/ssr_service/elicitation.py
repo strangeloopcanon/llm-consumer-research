@@ -27,7 +27,8 @@ class ElicitationClient:
         if not api_key:
             raise RuntimeError("OPENAI_API_KEY is not configured")
 
-        self._client = AsyncOpenAI(api_key=api_key, base_url=settings.openai_base_url)
+        base_url = str(settings.openai_base_url) if settings.openai_base_url else None
+        self._client = AsyncOpenAI(api_key=api_key, base_url=base_url)
         self._model = model_override or settings.openai_responses_model
 
     async def generate_rationale(

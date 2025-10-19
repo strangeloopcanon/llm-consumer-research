@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -11,7 +10,13 @@ import gradio as gr
 import pandas as pd
 
 from .config import get_settings
-from .models import ConceptInput, SimulationOptions, SimulationRequest
+from .models import (
+    ConceptInput,
+    SimulationOptions,
+    SimulationRequest,
+    SimulationResponse,
+    coerce_http_url,
+)
 from .orchestrator import run_simulation
 from .personas import load_library
 from .sample_data import default_sample, get_sample_ids, load_sample
@@ -20,10 +25,13 @@ SETTINGS = get_settings()
 PERSONA_LIBRARY = load_library(Path(SETTINGS.persona_library_path))
 
 
-def _read_file(file_obj: Optional[gr.File]) -> Optional[str]:
+def _read_file(file_obj: Optional[Any]) -> Optional[str]:
     if file_obj is None:
         return None
-    content = file_obj.read()
+    read_method = getattr(file_obj, "read", None)
+    if not callable(read_method):
+        return None
+    content = read_method()
     if isinstance(content, bytes):
         return content.decode("utf-8")
     return str(content)
@@ -131,11 +139,13 @@ async def simulate(
     if not description and not url and not sample_id:
         raise gr.Error("Provide either a concept description or a URL.")
 
+    concept_url = coerce_http_url(url)
+
     concept = ConceptInput(
         title=title or None,
         text=description or None,
         price=price or None,
-        url=url or None,
+        url=concept_url,
     )
 
     options = SimulationOptions(
