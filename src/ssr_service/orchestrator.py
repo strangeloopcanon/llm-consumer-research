@@ -79,6 +79,43 @@ def _make_distribution(
     )
 
 
+def _persona_highlights(persona: PersonaSpec) -> List[str]:
+    highlights: List[str] = []
+    if persona.age:
+        highlights.append(f"age {persona.age}")
+    if persona.gender:
+        highlights.append(persona.gender)
+    if persona.region:
+        highlights.append(persona.region)
+    if persona.income:
+        highlights.append(f"income {persona.income}")
+    if persona.occupation:
+        highlights.append(persona.occupation)
+    if persona.habits:
+        highlights.append("habits: " + ", ".join(persona.habits[:2]))
+    if persona.motivations:
+        highlights.append("motivations: " + ", ".join(persona.motivations[:2]))
+    if persona.preferred_channels:
+        highlights.append(
+            "channels: " + ", ".join(persona.preferred_channels[:2])
+        )
+    return highlights[:4]
+
+
+def _summarize_personas(persona_results: List[PersonaResult]) -> str:
+    if not persona_results:
+        return ""
+    segments = []
+    for result in persona_results:
+        persona = result.persona
+        highlights = _persona_highlights(persona)
+        if highlights:
+            segments.append(f"{persona.name}: {'; '.join(highlights)}")
+        else:
+            segments.append(persona.name)
+    return " | ".join(segments)
+
+
 async def _simulate_persona(
     persona: PersonaSpec,
     artifact: ConceptArtifact,
@@ -261,6 +298,7 @@ async def run_simulation(request: SimulationRequest) -> SimulationResponse:
         "draw_allocation": ",".join(str(d) for d in draw_counts),
         "ci_mean_lower": f"{ci_lower:.3f}",
         "ci_mean_upper": f"{ci_upper:.3f}",
+        "persona_summary": _summarize_personas(persona_results),
     }
 
     if request.sample_id:

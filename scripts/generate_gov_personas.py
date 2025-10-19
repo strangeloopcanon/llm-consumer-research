@@ -87,10 +87,28 @@ def make_us_toothpaste() -> Dict:
             "gender": "mixed",
             "region": "US",
             "income": "Varied",
+            "occupation": "Students and entry-level workers",
+            "education": "Some college or trade program",
+            "household": "Roommates or shared housing",
+            "purchase_frequency": "Replenishes whitening products every 4-6 weeks",
+            "background": (
+                "Balances social life, school, and first jobs while building routines."
+            ),
             "descriptors": [
                 "high social media usage",
                 "building oral care habits",
             ],
+            "habits": [
+                "watches TikTok reviews before buying",
+                "experiments with flavor-forward pastes",
+            ],
+            "motivations": [
+                "wants fast cosmetic results ahead of social events",
+                "responds to influencer proof",
+            ],
+            "pain_points": ["worries about enamel sensitivity"],
+            "preferred_channels": ["TikTok", "Discount retailers"],
+            "notes": "Looks for bundle deals that include whitening strips.",
             "weight": round(groups["18-24"] / total_pop, 4),
         },
         {
@@ -99,7 +117,20 @@ def make_us_toothpaste() -> Dict:
             "gender": "mixed",
             "region": "US",
             "income": "Middle",
+            "occupation": "Salaried professionals and parents",
+            "education": "Bachelor's or vocational degree",
+            "household": "Young families in suburban settings",
+            "purchase_frequency": "Keeps toothpaste stocked via monthly trips",
+            "background": "Juggles work schedules with family health routines.",
             "descriptors": ["busy professionals", "family-focused"],
+            "habits": ["buys at warehouse clubs", "reads parenting blogs for recommendations"],
+            "motivations": [
+                "seeks reliable preventive care for the household",
+                "values dentist endorsements",
+            ],
+            "pain_points": ["dislikes mess from whitening gels"],
+            "preferred_channels": ["Big-box retailers", "Online delivery services"],
+            "notes": "Open to auto-ship refills with kid-friendly flavors.",
             "weight": round(groups["25-44"] / total_pop, 4),
         },
         {
@@ -108,10 +139,28 @@ def make_us_toothpaste() -> Dict:
             "gender": "mixed",
             "region": "US",
             "income": "Middle-upper",
+            "occupation": "Established managers and caregivers",
+            "education": "College and postgraduate mix",
+            "household": "Multi-person households with teens or aging parents",
+            "purchase_frequency": "Sticks to brand multi-packs twice per quarter",
+            "background": (
+                "Maintains preventive health routines to avoid costly dental visits."
+            ),
             "descriptors": [
                 "established routines",
                 "value preventive care",
             ],
+            "habits": [
+                "reads Consumer Reports style guides",
+                "keeps backup stock in pantry",
+            ],
+            "motivations": [
+                "prioritizes enamel protection and long-term health",
+                "trusts ADA-certified claims",
+            ],
+            "pain_points": ["skeptical of gimmicky claims"],
+            "preferred_channels": ["Warehouse clubs", "Dental offices"],
+            "notes": "Appreciates subscription programs that include refill reminders.",
             "weight": round(groups["45-64"] / total_pop, 4),
         },
         {
@@ -120,7 +169,25 @@ def make_us_toothpaste() -> Dict:
             "gender": "mixed",
             "region": "US",
             "income": "Fixed income",
+            "occupation": "Retirees and part-time workers",
+            "education": "High school plus some college",
+            "household": "Smaller households or empty nesters",
+            "purchase_frequency": "Purchases gentle formulas every 2-3 months",
+            "background": (
+                "Focuses on comfort products that address sensitivity and dryness."
+            ),
             "descriptors": ["sensitive teeth", "brand loyal"],
+            "habits": [
+                "reads print circulars for coupons",
+                "consults dentists before switching brands",
+            ],
+            "motivations": [
+                "wants gentle formulas and medical reassurance",
+                "prefers value packs with loyalty rewards",
+            ],
+            "pain_points": ["dislikes strong abrasives or overpowering mint"],
+            "preferred_channels": ["Pharmacies", "Direct mail catalogs"],
+            "notes": "Responds well to senior discounts and caregiver bundles.",
             "weight": round(groups["65+"] / total_pop, 4),
         },
     ]
@@ -171,7 +238,25 @@ def make_us_backpack() -> Dict:
             "gender": "mixed",
             "region": "US",
             "income": "Student budget",
+            "occupation": "Full-time students and part-time service workers",
+            "education": "Undergraduate programs",
+            "household": "Dorms or shared apartments",
+            "purchase_frequency": "Replaces backpacks at start of each semester",
+            "background": (
+                "Splits time between classes, internships, and commuting across campus."
+            ),
             "descriptors": ["enrolled in college", "carry laptops daily"],
+            "habits": [
+                "walks or bikes to campus with tech gear",
+                "compares durability reviews on YouTube",
+            ],
+            "motivations": [
+                "wants lightweight protection for electronics",
+                "looks for multi-pocket organization",
+            ],
+            "pain_points": ["straps fray under heavy textbooks"],
+            "preferred_channels": ["Campus bookstores", "Online marketplaces"],
+            "notes": "Responds to student discounts and bundle deals with accessories.",
             "weight": round(segments["Campus"] / total, 4),
         },
         {
@@ -180,11 +265,26 @@ def make_us_backpack() -> Dict:
             "gender": "mixed",
             "region": "US",
             "income": "$50k-$99k",
+            "occupation": "Healthcare, education, and public sector professionals",
+            "education": "Mix of bachelor's and associate degrees",
+            "household": "Young families in suburban neighborhoods",
+            "purchase_frequency": "Adds gear seasonally ahead of trips",
+            "background": (
+                "Plans family day trips and hiking weekends that demand versatile storage."
+            ),
             "descriptors": [
                 "householders 25-44",
                 "middle income",
                 "active lifestyles",
             ],
+            "habits": ["researches gear blogs", "shops in-store to test comfort"],
+            "motivations": [
+                "needs rugged bags that transition from work to trails",
+                "values warranty coverage",
+            ],
+            "pain_points": ["dislikes bags that lack water resistance"],
+            "preferred_channels": ["Sporting goods chains", "Brand outlet stores"],
+            "notes": "Prefers earth-tone palettes and modular add-ons.",
             "weight": round(segments["MidIncome"] / total, 4),
         },
         {
@@ -193,11 +293,29 @@ def make_us_backpack() -> Dict:
             "gender": "mixed",
             "region": "US",
             "income": "$100k+",
+            "occupation": "Tech, finance, and consulting roles",
+            "education": "Bachelor's and graduate degrees",
+            "household": "Urban households with limited storage",
+            "purchase_frequency": "Upgrades premium gear every 18 months",
+            "background": (
+                "Values design-led products that look polished in client meetings."
+            ),
             "descriptors": [
                 "householders 25-44",
                 "urban professionals",
                 "premium gear seekers",
             ],
+            "habits": [
+                "follows minimalist product reviewers",
+                "shops direct-to-consumer brands",
+            ],
+            "motivations": [
+                "needs slim profiles that fit carry-on rules",
+                "expects laptop-first compartments with cable management",
+            ],
+            "pain_points": ["rejects noisy branding or bulky silhouettes"],
+            "preferred_channels": ["Direct brand websites", "Boutique tech retailers"],
+            "notes": "Will pay extra for recycled materials and lifetime guarantees.",
             "weight": round(segments["HighIncome"] / total, 4),
         },
     ]
@@ -231,7 +349,25 @@ def make_us_portable_storage() -> Dict:
             "gender": "mixed",
             "region": "US",
             "income": "Varied",
+            "occupation": "Service workers and gig earners",
+            "education": "High school plus certificates",
+            "household": "Multi-person households relying on smartphones",
+            "purchase_frequency": "Adds storage cards with every new device upgrade",
+            "background": (
+                "Streams entertainment exclusively on mobile networks with tight data caps."
+            ),
             "descriptors": ["cell data only", "stream on mobile"],
+            "habits": [
+                "backs up photos to SD cards",
+                "uses prepaid plans and retail kiosks",
+            ],
+            "motivations": [
+                "wants reliable offline media access",
+                "prioritizes affordability and durability",
+            ],
+            "pain_points": ["limited by mobile data throttling"],
+            "preferred_channels": ["Big box electronics aisles", "Wireless carrier stores"],
+            "notes": "Looks for bundles that include adapters across Android devices.",
             "weight": round(segments["CellOnly"] / total, 4),
         },
         {
@@ -240,7 +376,27 @@ def make_us_portable_storage() -> Dict:
             "gender": "mixed",
             "region": "US",
             "income": "Middle-upper",
+            "occupation": "Remote professionals and content creators",
+            "education": "Bachelor's degrees and certifications",
+            "household": "Dual-income households with home offices",
+            "purchase_frequency": "Purchases high-capacity drives quarterly for backups",
+            "background": (
+                "Moves large media files daily for work-from-home setups."
+            ),
             "descriptors": ["cable/fiber broadband only", "heavy file usage"],
+            "habits": [
+                "runs automated backups overnight",
+                "compares transfer speeds in tech forums",
+            ],
+            "motivations": [
+                "needs redundancy for client deliverables",
+                "values encryption and reliability",
+            ],
+            "pain_points": [
+                "frustrated by slow write speeds and drive failures",
+            ],
+            "preferred_channels": ["Online specialty retailers", "Manufacturer direct stores"],
+            "notes": "Interested in bundled cloud + hardware plans.",
             "weight": round(segments["BroadbandCable"] / total, 4),
         },
         {
@@ -249,7 +405,25 @@ def make_us_portable_storage() -> Dict:
             "gender": "mixed",
             "region": "US",
             "income": "Varied",
+            "occupation": "Retired or fixed-income households",
+            "education": "High school graduates",
+            "household": "Rural or small-town residences with limited broadband",
+            "purchase_frequency": "Buys external drives annually for photo archival",
+            "background": (
+                "Keeps family records and media offline due to unreliable internet access."
+            ),
             "descriptors": ["no internet access", "rely on physical backups"],
+            "habits": [
+                "prints photos and backs up on DVDs",
+                "shops local hardware stores for tech",
+            ],
+            "motivations": [
+                "wants simple plug-and-play storage",
+                "looks for long warranties",
+            ],
+            "pain_points": ["intimidated by complex setup instructions"],
+            "preferred_channels": ["Local electronics shops", "Mail-order catalogs"],
+            "notes": "Responds to phone support and easy-start guides.",
             "weight": round(segments["NoInternet"] / total, 4),
         },
     ]

@@ -30,6 +30,15 @@ def _coerce_float(value: Optional[str]) -> Optional[float]:
         return None
 
 
+def _coerce_str(value: object) -> Optional[str]:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        value = value.strip()
+        return value or None
+    return str(value).strip() or None
+
+
 def load_persona_group(path: Path) -> PersonaGroup:
     with path.open("r", encoding="utf-8") as fp:
         raw = yaml.safe_load(fp)
@@ -38,19 +47,44 @@ def load_persona_group(path: Path) -> PersonaGroup:
     description = str(raw.get("description", ""))
     personas_data = raw.get("personas", [])
 
+    def _list_field(entry: dict, key: str) -> List[str]:
+        value = entry.get(key, [])
+        if value is None:
+            return []
+        if isinstance(value, str):
+            return [item.strip() for item in value.split(";") if item.strip()]
+        if isinstance(value, list):
+            return [str(item) for item in value if str(item).strip()]
+        return []
+
     personas: List[PersonaSpec] = []
     for entry in personas_data:
-        personas.append(
-            PersonaSpec(
-                name=str(entry.get("name", "Persona")),
-                age=str(entry.get("age", "")) or None,
-                gender=str(entry.get("gender", "")) or None,
-                income=str(entry.get("income", "")) or None,
-                region=str(entry.get("region", "")) or None,
-                descriptors=list(entry.get("descriptors", [])),
-                weight=_coerce_float(entry.get("weight", 1.0)) or 1.0,
-            )
-        )
+        persona_data = {
+            "name": _coerce_str(entry.get("name")) or "Persona",
+            "age": _coerce_str(entry.get("age")),
+            "gender": _coerce_str(entry.get("gender")),
+            "income": _coerce_str(entry.get("income")),
+            "region": _coerce_str(entry.get("region")),
+            "occupation": _coerce_str(entry.get("occupation")),
+            "education": _coerce_str(entry.get("education")),
+            "household": _coerce_str(entry.get("household")),
+            "purchase_frequency": _coerce_str(
+                entry.get("purchase_frequency") or entry.get("purchase_freq")
+            ),
+            "usage_context": _coerce_str(
+                entry.get("usage") or entry.get("usage_context")
+            ),
+            "background": _coerce_str(entry.get("background")),
+            "habits": _list_field(entry, "habits"),
+            "motivations": _list_field(entry, "motivations"),
+            "pain_points": _list_field(entry, "pain_points"),
+            "preferred_channels": _list_field(entry, "preferred_channels"),
+            "notes": _coerce_str(entry.get("notes")),
+            "source": _coerce_str(entry.get("persona_source") or entry.get("source")),
+            "descriptors": _list_field(entry, "descriptors"),
+            "weight": _coerce_float(entry.get("weight", 1.0)) or 1.0,
+        }
+        personas.append(PersonaSpec.model_validate(persona_data))
 
     if not personas:
         raise ValueError(f"Persona file {path} contains no personas")
@@ -89,20 +123,37 @@ def personas_from_csv(
 
     with fh:
         reader = csv.DictReader(fh)
+
+        def _split_list(value: Optional[str]) -> List[str]:
+            if not value:
+                return []
+            return [item.strip() for item in value.split(";") if item.strip()]
+
         for row in reader:
-            descriptors = row.get("descriptors") or row.get("traits") or ""
-            descriptor_list = [d.strip() for d in descriptors.split(";") if d.strip()]
-            personas.append(
-                PersonaSpec(
-                    name=row.get("name") or f"Persona {len(personas) + 1}",
-                    age=row.get("age") or None,
-                    gender=row.get("gender") or None,
-                    income=row.get("income") or None,
-                    region=row.get("region") or None,
-                    descriptors=descriptor_list,
-                    weight=_coerce_float(row.get("weight")) or 1.0,
-                )
-            )
+            persona_data = {
+                "name": row.get("name") or f"Persona {len(personas) + 1}",
+                "age": row.get("age") or None,
+                "gender": row.get("gender") or None,
+                "income": row.get("income") or None,
+                "region": row.get("region") or None,
+                "occupation": row.get("occupation") or None,
+                "education": row.get("education") or None,
+                "household": row.get("household") or None,
+                "purchase_frequency": row.get("purchase_frequency")
+                or row.get("purchase_freq")
+                or None,
+                "usage_context": row.get("usage") or row.get("usage_context") or None,
+                "background": row.get("background") or None,
+                "habits": _split_list(row.get("habits")),
+                "motivations": _split_list(row.get("motivations")),
+                "pain_points": _split_list(row.get("pain_points")),
+                "preferred_channels": _split_list(row.get("preferred_channels")),
+                "notes": row.get("notes") or None,
+                "source": row.get("persona_source") or row.get("source") or None,
+                "descriptors": _split_list(row.get("descriptors") or row.get("traits")),
+                "weight": _coerce_float(row.get("weight")) or 1.0,
+            }
+            personas.append(PersonaSpec.model_validate(persona_data))
 
     if not personas:
         raise ValueError("CSV did not yield any personas")

@@ -8,25 +8,76 @@ personas:
   gender: mixed
   region: US
   income: Varied
+  occupation: Service workers and gig earners
+  education: High school plus certificates
+  household: Multi-person households relying on smartphones
+  purchase_frequency: Adds storage cards with every new device upgrade
+  background: Streams entertainment exclusively on mobile networks with tight data caps.
   descriptors:
   - cell data only
   - stream on mobile
+  habits:
+  - backs up photos to SD cards
+  - uses prepaid plans and retail kiosks
+  motivations:
+  - wants reliable offline media access
+  - prioritizes affordability and durability
+  pain_points:
+  - limited by mobile data throttling
+  preferred_channels:
+  - Big box electronics aisles
+  - Wireless carrier stores
+  notes: Looks for bundles that include adapters across Android devices.
   weight: 0.4971
 - name: Broadband Power Users
   age: 25-64
   gender: mixed
   region: US
   income: Middle-upper
+  occupation: Remote professionals and content creators
+  education: Bachelor's degrees and certifications
+  household: Dual-income households with home offices
+  purchase_frequency: Purchases high-capacity drives quarterly for backups
+  background: Moves large media files daily for work-from-home setups.
   descriptors:
   - cable/fiber broadband only
   - heavy file usage
+  habits:
+  - runs automated backups overnight
+  - compares transfer speeds in tech forums
+  motivations:
+  - needs redundancy for client deliverables
+  - values encryption and reliability
+  pain_points:
+  - frustrated by slow write speeds and drive failures
+  preferred_channels:
+  - Online specialty retailers
+  - Manufacturer direct stores
+  notes: Interested in bundled cloud + hardware plans.
   weight: 0.2184
 - name: Offline Households
   age: 35+
   gender: mixed
   region: US
   income: Varied
+  occupation: Retired or fixed-income households
+  education: High school graduates
+  household: Rural or small-town residences with limited broadband
+  purchase_frequency: Buys external drives annually for photo archival
+  background: Keeps family records and media offline due to unreliable internet access.
   descriptors:
   - no internet access
   - rely on physical backups
+  habits:
+  - prints photos and backs up on DVDs
+  - shops local hardware stores for tech
+  motivations:
+  - wants simple plug-and-play storage
+  - looks for long warranties
+  pain_points:
+  - intimidated by complex setup instructions
+  preferred_channels:
+  - Local electronics shops
+  - Mail-order catalogs
+  notes: Responds to phone support and easy-start guides.
   weight: 0.2845

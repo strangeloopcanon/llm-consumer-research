@@ -8,4 +8,6 @@ __all__ = [
     "ssr",
     "orchestrator",
     "api",
+    "simple_interface",
+    "simple_cli",
 ]
