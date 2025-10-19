@@ -1,29 +1,53 @@
 # Synthetic Consumer Research Service
 
-Reimagining concept testing for product teams that need insight in minutes, not weeks. This repo is the reference implementation of our synthetic panel: it turns a product idea plus an audience description into survey-quality distributions, qualitative rationale, and diagnostics you can actually ship.
+**Tired of waiting weeks for consumer research? This tool gives you survey-quality insights in minutes.**
 
-## Why this exists
+Imagine you have a new product idea. Instead of spending weeks and thousands of dollars on traditional focus groups, you can use this service to get instant feedback from a "virtual" panel of consumers. This helps you make better decisions, faster.
 
-- **Traditional consumer research is slow and expensive.** Classic panels need recruiting, incentives, and weeks of field time before you see a histogram. Marketers and PMs often compromise with ad hoc surveys or gut instinct.
-- **LLMs unlock cheap respondents but need discipline.** Asking a model for a Likert score produces confident nonsense unless you constrain context, persona voice, and scoring. We pair models with deterministic anchors so teams can trust the output.
-- **We’re building a new standard for rapid insight.** This project is the baseline service we operate: a monolithic Python app with type-safe interfaces, reproducible anchors, and gates for safety, cost, and observability.
+## Who is this for?
+
+*   **Product Managers & Marketers:** Quickly test new product concepts, messaging, or pricing.
+*   **Researchers & Analysts:** Augment traditional research methods with rapid, cost-effective synthetic data.
+*   **Anyone who needs to understand a target audience deeply and quickly.**
+
+## Why does this exist?
+
+*   **Traditional consumer research is slow and expensive.** Finding the right people, running surveys, and analyzing data can take a long time and a lot of money. This often leads to teams skipping research and relying on gut instinct.
+*   **AI can be a powerful research tool, but it needs to be used correctly.** You can't just ask a chatbot "Would you buy this product?". The answers are often unreliable. Our service uses a disciplined, structured approach to ensure the results are trustworthy.
+*   **We're creating a new standard for rapid insights.** This project provides a reliable, transparent, and auditable way to use AI for consumer research.
+
+## How it works: A virtual focus group
+
+Think of our service as a highly advanced virtual focus group. Here’s a simplified look at how it works:
+
+1.  **You provide the product idea.** This can be as simple as a short description, a product title, and a price. You also tell us who your target audience is (e.g., "health-conscious moms" or "tech-savvy students").
+2.  **We create "AI personas".** Based on your target audience, we create a panel of virtual consumers. These AI personas are designed to think and behave like real people from that demographic.
+3.  **The AI personas "react" to your idea.** Each AI persona provides feedback on your product concept, explaining what they like, what they don't like, and why.
+4.  **We analyze the feedback.** We process all the qualitative feedback and translate it into easy-to-understand charts and summaries, like purchase intent scores (e.g., "7 out of 10 would buy").
+
+The result is a rich, detailed report that tells you not just *what* your target audience thinks, but *why* they think it.
 
 ## What you get out of the box
 
-- Weighted Likert distributions (mean, top-2 box, bootstrap CIs) per persona and in aggregate.
-- Concise persona-specific rationales and top recurring themes to understand *why* the score shifted.
-- A FastAPI endpoint, Gradio UI, and CLI hooks that plug into existing research workflows.
-- Typed Pydantic models, deterministic anchor banks, and test suites (unit + LLM golden) to keep changes safe.
+*   **Clear, actionable insights:** See how likely your target audience is to buy your product, with easy-to-read charts and scores.
+*   **Qualitative feedback:** Understand the "why" behind the scores with concise summaries of the AI personas' reasoning.
+*   **Flexible and easy to use:** Interact with the service through a simple web interface, a command-line tool, or by integrating it into your own applications.
+*   **Trustworthy and transparent:** Our methods are designed to be reliable and reproducible, with clear documentation on how the AI models are used.
 
-## How the engine works
+---
+## Technical Details
 
-1. **Ingest the concept.** We accept free-text copy or fetch a URL, normalize the payload, and build a prompt block with provenance.
-2. **Elicit synthetic respondents.** For each persona, GPT-5 (Responses API) roleplays realistic rationales with enforced JSON outputs, caching, and retry controls.
-3. **Map rationales to Likert space.** Semantic Similarity Rating (SSR) embeds each rationale against curated anchor banks, averages across variants, and aggregates to personas and overall distributions.
+For our technical users, here's a deeper dive into the implementation.
+
+### How the engine works (technical version)
+
+1.  **Ingest the concept.** We accept free-text copy or fetch a URL, normalize the payload, and build a prompt block with provenance.
+2.  **Elicit synthetic respondents.** For each persona, a Large Language Model (LLM) roleplays realistic rationales with enforced JSON outputs, caching, and retry controls.
+3.  **Map rationales to Likert space.** Semantic Similarity Rating (SSR) embeds each rationale against curated anchor banks, averages across variants, and aggregates to personas and overall distributions.
 
 The result is a transparent pipeline: every decision—persona weights, anchors, models, retry budget—is versioned and auditable.
 
-## Run it locally
+### Run it locally
 
 ```bash
 python3.11 -m venv .venv311
@@ -68,7 +92,7 @@ The response includes:
 - Metadata describing the prompt, anchor bank, and bootstrap CIs for the average score.
 - Persona summaries that highlight the segment backgrounds powering the simulation.
 
-## Anatomy of the repo
+### Anatomy of the repo
 
 - `src/ssr_service/api.py` – FastAPI surface exposing `/health` and `/simulate`.
 - `src/ssr_service/orchestrator.py` – the heart of the pipeline (ingestion → elicitation → SSR → aggregation).
@@ -81,7 +105,7 @@ The response includes:
 - `scripts/generate_gov_personas.py` – reproducible persona regeneration straight from the U.S. Census Bureau ACS API.
 - `tests/` & `tests_llm_live/` – unit tests plus golden-schema validation for live LLM runs.
 
-## Configuration
+### Configuration
 
 - `OPENAI_API_KEY` – required.
 - `OPENAI_BASE_URL` – optional custom endpoint.
@@ -92,7 +116,7 @@ The response includes:
 
 All settings are loaded via `pydantic-settings`; `.env` in the repo root is respected.
 
-## Personas and sampling
+### Personas and sampling
 
 - Built-in persona groups live in `src/ssr_service/data/personas`. Each YAML notes the specific ACS table used (e.g. B01001, B14004, B19037, B28002). Use a `persona_group` value (e.g. `us_toothpaste_buyers`, `us_backpack_buyers`, `us_portable_storage_buyers`) in the API body to pull the pre-weighted mix.
 - Provide `persona_csv` with CSV text to define custom segments. Supported columns include:
@@ -131,13 +155,13 @@ This script hits the Census API to pull:
 
 The resulting weights are normalized and written into the YAMLs mentioned above, keeping everything traceable to official U.S. government publications.
 
-## Notes
+### Notes
 
 - The current MVP focuses on SSR for 5-point purchase intent. Additional intents can be added by defining new anchor YAML files.
 - Concurrency is configurable through `MAX_CONCURRENCY` (default 64). The orchestrator retries once on transient API errors.
 - Bootstrap CIs are computed over respondent-level means; increase `options.n` for more stable estimates.
 
-## Gradio frontend
+### Gradio frontend
 
 Launch the interactive UI:
 
@@ -155,7 +179,7 @@ The UI lets you:
 - Override the intent question.
 - Inspect aggregate metrics, persona breakdowns, and metadata directly in the browser.
 
-## Quick CLI runner
+### Quick CLI runner
 
 Prefer a terminal workflow? Use the simplified entry point:
 
@@ -170,6 +194,6 @@ python -m ssr_service.simple_cli \
 
 The command prints either a concise summary or full JSON (via `--json`), pulling enriched persona context into the prompt automatically. Point `--persona-csv` at your own panel export to override the built-in groups.
 
-## Roadmap highlights
+### Roadmap highlights
 
 This repo tracks the production roadmap in `plan.md` (ignored by Git for local iteration). Upcoming milestones include richer retrieval (competitors, reviews), persistent storage, cost metering, and multi-provider diagnostics. Contributions that move us toward trustworthy, rapid consumer insight are welcome—open an issue before large architectural changes.
