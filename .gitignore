@@ -17,6 +17,7 @@ venv/
 # Data / caches
 *.log
 *.tmp
+.beads/*.db
 
 # Environment files
 .env

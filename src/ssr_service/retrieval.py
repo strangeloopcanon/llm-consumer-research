@@ -44,7 +44,8 @@ async def fetch_url_text(url: str) -> tuple[Optional[str], str]:
         response.raise_for_status()
 
     soup = BeautifulSoup(response.text, "html.parser")
-    title = soup.title.string.strip() if soup.title else None
+    title_node = soup.title.string if soup.title else None
+    title = str(title_node).strip() if title_node else None
 
     article = " ".join(
         p.get_text(separator=" ", strip=True)

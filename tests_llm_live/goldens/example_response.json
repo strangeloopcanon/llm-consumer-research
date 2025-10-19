@@ -1,0 +1,62 @@
+{
+  "aggregate": {
+    "ratings": [1, 2, 3, 4, 5],
+    "pmf": [0.05, 0.1, 0.2, 0.35, 0.3],
+    "mean": 3.75,
+    "top2box": 0.65,
+    "sample_n": 200
+  },
+  "personas": [
+    {
+      "persona": {
+        "name": "Value Seekers",
+        "age": "30-44",
+        "gender": "female",
+        "income": "Lower",
+        "region": "US",
+        "descriptors": ["budget-conscious", "coupon user"],
+        "weight": 0.6
+      },
+      "distribution": {
+        "ratings": [1, 2, 3, 4, 5],
+        "pmf": [0.05, 0.12, 0.25, 0.33, 0.25],
+        "mean": 3.61,
+        "top2box": 0.58,
+        "sample_n": 120
+      },
+      "rationales": [
+        "The product appears affordable and practical for daily use.",
+        "Would consider purchasing if coupons or promotions are available."
+      ],
+      "themes": ["affordability", "practicality"]
+    },
+    {
+      "persona": {
+        "name": "Premium Loyalists",
+        "age": "30-44",
+        "gender": "male",
+        "income": "Upper",
+        "region": "US",
+        "descriptors": ["premium", "brand loyal"],
+        "weight": 0.4
+      },
+      "distribution": {
+        "ratings": [1, 2, 3, 4, 5],
+        "pmf": [0.02, 0.05, 0.18, 0.38, 0.37],
+        "mean": 4.02,
+        "top2box": 0.75,
+        "sample_n": 80
+      },
+      "rationales": [
+        "High-quality ingredients and premium positioning align with preferences."
+      ],
+      "themes": ["premium", "quality"]
+    }
+  ],
+  "metadata": {
+    "model": "openai/gpt-5-mini",
+    "embedding_model": "openai/text-embedding-3-small",
+    "anchor_bank": "purchase_intent_en.yml",
+    "golden_id": "baseline-toothpaste-sample"
+  }
+}

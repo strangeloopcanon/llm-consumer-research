@@ -38,7 +38,7 @@ class AppSettings(BaseSettings):
 def get_settings() -> AppSettings:
     """Return cached settings instance."""
 
-    return AppSettings()  # type: ignore[arg-type]
+    return AppSettings()
 
 
 __all__ = ["AppSettings", "get_settings"]

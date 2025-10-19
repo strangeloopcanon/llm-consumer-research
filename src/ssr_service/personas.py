@@ -6,7 +6,7 @@ import csv
 from dataclasses import dataclass
 from io import StringIO
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, Union
+from typing import Dict, Iterable, List, Optional, TextIO, Union
 
 import yaml
 
@@ -81,6 +81,7 @@ def personas_from_csv(
     csv_source: Union[Path, str], encoding: str = "utf-8"
 ) -> List[PersonaSpec]:
     personas: List[PersonaSpec] = []
+    fh: TextIO
     if isinstance(csv_source, Path):
         fh = csv_source.open("r", encoding=encoding, newline="")
     else:

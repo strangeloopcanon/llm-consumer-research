@@ -19,6 +19,7 @@ from .models import (
     SimulationOptions,
     SimulationRequest,
     SimulationResponse,
+    coerce_http_url,
 )
 from .personas import ensure_weights, get_persona_group, personas_from_csv
 from .retrieval import ConceptArtifact, ingest_concept
@@ -169,11 +170,14 @@ async def run_simulation(request: SimulationRequest) -> SimulationResponse:
 
     if request.sample_id:
         sample = load_sample(request.sample_id)
+        combined_url = coerce_http_url(concept_input.url) or coerce_http_url(
+            sample.source
+        )
         concept_input = ConceptInput(
             title=concept_input.title or sample.title,
             text=concept_input.text or sample.description,
             price=concept_input.price or sample.price,
-            url=concept_input.url or sample.source,
+            url=combined_url,
         )
         persona_group = persona_group or sample.persona_group
         if not intent_question_override and sample.intent_question:
