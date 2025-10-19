@@ -7,34 +7,102 @@ personas:
   gender: mixed
   region: US
   income: Varied
+  occupation: Students and entry-level workers
+  education: Some college or trade program
+  household: Roommates or shared housing
+  purchase_frequency: Replenishes whitening products every 4-6 weeks
+  background: Balances social life, school, and first jobs while building routines.
   descriptors:
   - high social media usage
   - building oral care habits
+  habits:
+  - watches TikTok reviews before buying
+  - experiments with flavor-forward pastes
+  motivations:
+  - wants fast cosmetic results ahead of social events
+  - responds to influencer proof
+  pain_points:
+  - worries about enamel sensitivity
+  preferred_channels:
+  - TikTok
+  - Discount retailers
+  notes: Looks for bundle deals that include whitening strips.
   weight: 0.1198
 - name: Prime Working Age 25-44
   age: 25-44
   gender: mixed
   region: US
   income: Middle
+  occupation: Salaried professionals and parents
+  education: Bachelor's or vocational degree
+  household: Young families in suburban settings
+  purchase_frequency: Keeps toothpaste stocked via monthly trips
+  background: Juggles work schedules with family health routines.
   descriptors:
   - busy professionals
   - family-focused
+  habits:
+  - buys at warehouse clubs
+  - reads parenting blogs for recommendations
+  motivations:
+  - seeks reliable preventive care for the household
+  - values dentist endorsements
+  pain_points:
+  - dislikes mess from whitening gels
+  preferred_channels:
+  - Big-box retailers
+  - Online delivery services
+  notes: Open to auto-ship refills with kid-friendly flavors.
   weight: 0.3421
 - name: Midlife Households 45-64
   age: 45-64
   gender: mixed
   region: US
   income: Middle-upper
+  occupation: Established managers and caregivers
+  education: College and postgraduate mix
+  household: Multi-person households with teens or aging parents
+  purchase_frequency: Sticks to brand multi-packs twice per quarter
+  background: Maintains preventive health routines to avoid costly dental visits.
   descriptors:
   - established routines
   - value preventive care
+  habits:
+  - reads Consumer Reports style guides
+  - keeps backup stock in pantry
+  motivations:
+  - prioritizes enamel protection and long-term health
+  - trusts ADA-certified claims
+  pain_points:
+  - skeptical of gimmicky claims
+  preferred_channels:
+  - Warehouse clubs
+  - Dental offices
+  notes: Appreciates subscription programs that include refill reminders.
   weight: 0.3165
 - name: Older Adults 65+
   age: 65+
   gender: mixed
   region: US
   income: Fixed income
+  occupation: Retirees and part-time workers
+  education: High school plus some college
+  household: Smaller households or empty nesters
+  purchase_frequency: Purchases gentle formulas every 2-3 months
+  background: Focuses on comfort products that address sensitivity and dryness.
   descriptors:
   - sensitive teeth
   - brand loyal
+  habits:
+  - reads print circulars for coupons
+  - consults dentists before switching brands
+  motivations:
+  - wants gentle formulas and medical reassurance
+  - prefers value packs with loyalty rewards
+  pain_points:
+  - dislikes strong abrasives or overpowering mint
+  preferred_channels:
+  - Pharmacies
+  - Direct mail catalogs
+  notes: Responds well to senior discounts and caregiver bundles.
   weight: 0.2216

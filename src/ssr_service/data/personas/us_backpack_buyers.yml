@@ -8,27 +8,78 @@ personas:
   gender: mixed
   region: US
   income: Student budget
+  occupation: Full-time students and part-time service workers
+  education: Undergraduate programs
+  household: Dorms or shared apartments
+  purchase_frequency: Replaces backpacks at start of each semester
+  background: Splits time between classes, internships, and commuting across campus.
   descriptors:
   - enrolled in college
   - carry laptops daily
+  habits:
+  - walks or bikes to campus with tech gear
+  - compares durability reviews on YouTube
+  motivations:
+  - wants lightweight protection for electronics
+  - looks for multi-pocket organization
+  pain_points:
+  - straps fray under heavy textbooks
+  preferred_channels:
+  - Campus bookstores
+  - Online marketplaces
+  notes: Responds to student discounts and bundle deals with accessories.
   weight: 0.2864
 - name: Outdoor Weekenders
   age: 25-44
   gender: mixed
   region: US
   income: $50k-$99k
+  occupation: Healthcare, education, and public sector professionals
+  education: Mix of bachelor's and associate degrees
+  household: Young families in suburban neighborhoods
+  purchase_frequency: Adds gear seasonally ahead of trips
+  background: Plans family day trips and hiking weekends that demand versatile storage.
   descriptors:
   - householders 25-44
   - middle income
   - active lifestyles
+  habits:
+  - researches gear blogs
+  - shops in-store to test comfort
+  motivations:
+  - needs rugged bags that transition from work to trails
+  - values warranty coverage
+  pain_points:
+  - dislikes bags that lack water resistance
+  preferred_channels:
+  - Sporting goods chains
+  - Brand outlet stores
+  notes: Prefers earth-tone palettes and modular add-ons.
   weight: 0.3093
 - name: Minimalist Professionals
   age: 25-44
   gender: mixed
   region: US
   income: $100k+
+  occupation: Tech, finance, and consulting roles
+  education: Bachelor's and graduate degrees
+  household: Urban households with limited storage
+  purchase_frequency: Upgrades premium gear every 18 months
+  background: Values design-led products that look polished in client meetings.
   descriptors:
   - householders 25-44
   - urban professionals
   - premium gear seekers
+  habits:
+  - follows minimalist product reviewers
+  - shops direct-to-consumer brands
+  motivations:
+  - needs slim profiles that fit carry-on rules
+  - expects laptop-first compartments with cable management
+  pain_points:
+  - rejects noisy branding or bulky silhouettes
+  preferred_channels:
+  - Direct brand websites
+  - Boutique tech retailers
+  notes: Will pay extra for recycled materials and lifetime guarantees.
   weight: 0.4043

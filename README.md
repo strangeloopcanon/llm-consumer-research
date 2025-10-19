@@ -66,6 +66,7 @@ The response includes:
 - Per-persona Likert pmf, mean, top-2 box, rationales, and key themes.
 - Aggregate distribution weighted by persona weights.
 - Metadata describing the prompt, anchor bank, and bootstrap CIs for the average score.
+- Persona summaries that highlight the segment backgrounds powering the simulation.
 
 ## Anatomy of the repo
 
@@ -94,12 +95,18 @@ All settings are loaded via `pydantic-settings`; `.env` in the repo root is resp
 ## Personas and sampling
 
 - Built-in persona groups live in `src/ssr_service/data/personas`. Each YAML notes the specific ACS table used (e.g. B01001, B14004, B19037, B28002). Use a `persona_group` value (e.g. `us_toothpaste_buyers`, `us_backpack_buyers`, `us_portable_storage_buyers`) in the API body to pull the pre-weighted mix.
-- Provide `persona_csv` with CSV text to define custom segments. Expected columns: `name, age, gender, region, income, descriptors` (semicolon-separated) and `weight` (fractional). Example:
+- Provide `persona_csv` with CSV text to define custom segments. Supported columns include:
+  - Core demographics: `name, age, gender, region, income, occupation, education, household`.
+  - Behavioural detail: `habits`, `motivations`, `pain_points`, `preferred_channels`, `purchase_frequency`, `background`, `notes` (semicolon-separated fields).
+  - Weighting: `weight` (fractional, will be normalized if the column is missing or does not sum to 1).
+  - Misc aliases: `traits` maps to `descriptors`; `purchase_freq` maps to `purchase_frequency`.
+
+  Example:
 
   ```csv
-  name,age,gender,region,income,descriptors,weight
-  Value Seekers,30-49,female,US,Lower,"budget;coupon",0.6
-  Premium Loyalists,30-49,male,US,Upper,"premium;brand loyal",0.4
+  name,age,gender,region,income,occupation,habits,motivations,preferred_channels,weight
+  Value Seekers,30-49,female,US,Lower,Retail associate,"coupon stacking;night stock runs","stretch paycheck","Email;SMS",0.6
+  Premium Loyalists,30-49,male,US,Upper,Product lead,"reads design blogs","pay for craftsmanship","Instagram",0.4
   ```
 
 - Sampling knobs:
@@ -147,6 +154,21 @@ The UI lets you:
 - Select per-persona or stratified total sample sizes.
 - Override the intent question.
 - Inspect aggregate metrics, persona breakdowns, and metadata directly in the browser.
+
+## Quick CLI runner
+
+Prefer a terminal workflow? Use the simplified entry point:
+
+```bash
+source .venv311/bin/activate
+python -m ssr_service.simple_cli \
+  --concept-text "A sparkling hydration tablet that dissolves in 30 seconds." \
+  --persona-group us_toothpaste_buyers \
+  --samples-per-persona 20 \
+  --json
+```
+
+The command prints either a concise summary or full JSON (via `--json`), pulling enriched persona context into the prompt automatically. Point `--persona-csv` at your own panel export to override the built-in groups.
 
 ## Roadmap highlights
 

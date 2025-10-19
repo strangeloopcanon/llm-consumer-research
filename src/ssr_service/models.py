@@ -26,7 +26,18 @@ class PersonaSpec(BaseModel):
     gender: Optional[str] = None
     income: Optional[str] = None
     region: Optional[str] = None
+    occupation: Optional[str] = None
+    education: Optional[str] = None
+    household: Optional[str] = None
+    purchase_frequency: Optional[str] = Field(default=None, alias="purchase_freq")
     usage_context: Optional[str] = Field(default=None, alias="usage")
+    background: Optional[str] = None
+    habits: List[str] = Field(default_factory=list)
+    motivations: List[str] = Field(default_factory=list)
+    pain_points: List[str] = Field(default_factory=list)
+    preferred_channels: List[str] = Field(default_factory=list)
+    notes: Optional[str] = None
+    source: Optional[str] = None
     descriptors: List[str] = Field(default_factory=list)
     weight: float = Field(default=1.0, ge=0)
 
@@ -42,10 +53,31 @@ class PersonaSpec(BaseModel):
             parts.append(f"income: {self.income}")
         if self.usage_context:
             parts.append(f"usage context: {self.usage_context}")
-        if self.descriptors:
-            parts.append(
-                "additional traits: " + ", ".join(self.descriptors)
-            )
+        if self.occupation:
+            parts.append(f"occupation: {self.occupation}")
+        if self.education:
+            parts.append(f"education: {self.education}")
+        if self.household:
+            parts.append(f"household: {self.household}")
+        if self.purchase_frequency:
+            parts.append(f"purchase cadence: {self.purchase_frequency}")
+        if self.background:
+            parts.append(self.background)
+
+        def _format_list(label: str, values: List[str]) -> None:
+            if not values:
+                return
+            trimmed = ", ".join(values[:3])
+            parts.append(f"{label}: {trimmed}")
+
+        _format_list("habits", self.habits)
+        _format_list("motivations", self.motivations)
+        _format_list("pain points", self.pain_points)
+        _format_list("preferred channels", self.preferred_channels)
+        _format_list("additional traits", self.descriptors)
+
+        if self.notes:
+            parts.append(self.notes)
         return ", ".join(parts) if parts else "a representative consumer"
 
 
