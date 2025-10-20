@@ -144,6 +144,7 @@ async def simulate(
     persona_filters_text: str,
     persona_generations_text: str,
     persona_injections_text: str,
+    additional_questions_text: str,
     population_spec_text: str,
     population_spec_file,
     n_per_persona: int,
@@ -220,6 +221,13 @@ async def simulate(
                 except ValueError as exc:  # pragma: no cover
                     raise gr.Error(f"Invalid persona injection: {exc}") from exc
 
+    additional_questions: List[str] = []
+    if additional_questions_text:
+        for line in additional_questions_text.splitlines():
+            line = line.strip()
+            if line:
+                additional_questions.append(line)
+
     population_spec = None
     spec_text: Optional[str] = None
     if population_spec_file is not None:
@@ -241,6 +249,7 @@ async def simulate(
         persona_generations=persona_generations,
         persona_injections=persona_injections,
         population_spec=population_spec,
+        questions=additional_questions,
         sample_id=sample_id or None,
         intent_question=custom_question or None,
         options=options,
@@ -365,6 +374,11 @@ def launch(
                     "Example: name=Custom Segment;descriptors=loyal,premium;share=0.2"
                 ),
             )
+            additional_questions_input = gr.Textbox(
+                label="Additional Questions",
+                lines=3,
+                placeholder="One question per line (defaults always include primary intent question)",
+            )
             population_spec_input = gr.Textbox(
                 label="Population Spec (YAML/JSON)",
                 lines=4,
@@ -443,6 +457,7 @@ def launch(
                 persona_filter_input,
                 persona_generation_input,
                 persona_injection_input,
+                additional_questions_input,
                 population_spec_input,
                 population_spec_file,
                 n_input,

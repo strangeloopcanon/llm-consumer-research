@@ -12,9 +12,11 @@ from ssr_service.models import (
     PersonaFilter,
     PersonaGenerationTask,
     PersonaInjection,
+    PersonaQuestionResult,
     PersonaResult,
     PersonaSpec,
     PopulationSpec,
+    QuestionAggregate,
     SimulationRequest,
     SimulationResponse,
 )
@@ -64,16 +66,31 @@ def test_run_simple_simulation_monkeypatched(monkeypatch):
             sample_n=25,
         )
         persona = PersonaSpec(name="Test Persona", weight=1.0)
+        question_result = PersonaQuestionResult(
+            question_id="q1",
+            question="How likely would you be to purchase this product?",
+            distribution=aggregate,
+            rationales=["Great fit"],
+            themes=["value"],
+        )
         result = PersonaResult(
             persona=persona,
             distribution=aggregate,
             rationales=["Great fit"],
             themes=["value"],
+            question_results=[question_result],
         )
         return SimulationResponse(
             aggregate=aggregate,
             personas=[result],
             metadata={"persona_summary": "Test Persona"},
+            questions=[
+                QuestionAggregate(
+                    question_id="q1",
+                    question="How likely would you be to purchase this product?",
+                    aggregate=aggregate,
+                )
+            ],
         )
 
     monkeypatch.setattr(simple_interface, "run_simulation", fake_run_simulation)
@@ -81,10 +98,14 @@ def test_run_simple_simulation_monkeypatched(monkeypatch):
     response = simple_interface.run_simple_simulation(
         concept_text="A premium sparkling water.",
         samples_per_persona=10,
+        questions=["How relevant is this concept to you?"],
     )
 
     assert response.aggregate.mean == 3.2
     assert captured["request"].concept.text == "A premium sparkling water."
+    assert captured["request"].questions == [
+        "How relevant is this concept to you?"
+    ]
 
 
 def test_build_simple_request_dynamic_personas():
@@ -101,9 +122,11 @@ def test_build_simple_request_dynamic_personas():
         persona_generations=[persona_generation],
         persona_injections=[persona_injection],
         population_spec=population_spec,
+        questions=["How relevant is this product?"],
     )
 
     assert request.persona_filters[0].include["age"] == ["25-44"]
     assert request.persona_generations[0].prompt == "Eco travellers"
     assert request.persona_injections[0].persona.name == "VIP"
     assert request.population_spec == population_spec
+    assert request.questions == ["How relevant is this product?"]
