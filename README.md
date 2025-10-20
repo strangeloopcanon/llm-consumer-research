@@ -122,33 +122,18 @@ All settings are loaded via `pydantic-settings`; `.env` in the repo root is resp
 
 ### Personas and sampling
 
-- Built-in persona groups live in `src/ssr_service/data/personas`. Each YAML notes the specific ACS table used (e.g. B01001, B14004, B19037, B28002). Use a `persona_group` value (e.g. `us_toothpaste_buyers`, `us_backpack_buyers`, `us_portable_storage_buyers`) in the API body to pull the pre-weighted mix.
-- Provide `persona_csv` with CSV text to define custom segments. Supported columns include:
-  - Core demographics: `name, age, gender, region, income, occupation, education, household`.
-  - Behavioural detail: `habits`, `motivations`, `pain_points`, `preferred_channels`, `purchase_frequency`, `background`, `notes` (semicolon-separated fields).
-  - Weighting: `weight` (fractional, will be normalized if the column is missing or does not sum to 1).
-  - Misc aliases: `traits` maps to `descriptors`; `purchase_freq` maps to `purchase_frequency`.
-
-  Example:
-
-  ```csv
-  name,age,gender,region,income,occupation,habits,motivations,preferred_channels,weight
-  Value Seekers,30-49,female,US,Lower,Retail associate,"coupon stacking;night stock runs","stretch paycheck","Email;SMS",0.6
-  Premium Loyalists,30-49,male,US,Upper,Product lead,"reads design blogs","pay for craftsmanship","Instagram",0.4
-  ```
-
-- Sampling knobs:
-- `options.n` = per-persona respondent count (default 200).
-- `options.total_n` + `options.stratified` (true) allocate respondents across personas in proportion to their weights.
-- `sample_id` (optional) lets you bootstrap a request from the demo scenarios in `demo_samples.json`.
+- Built-in persona groups live in `src/ssr_service/data/personas`. Each YAML notes the ACS table sources. Provide `persona_group` (e.g. `us_toothpaste_buyers`, `us_backpack_buyers`) to seed the request with those weighted personas.
+- Provide `persona_csv` to define custom segments. Columns can include demographics (`name`, `age`, `gender`, `region`, `income`, `occupation`, `education`, `household`), behavioural lists (`habits`, `motivations`, etc.), and `weight`. Unsupported columns are ignored.
+- Sampling knobs: `options.n` (per-persona respondents), `options.total_n` + `options.stratified` for weighted allocation, and `sample_id` to load a demo scenario from `demo_samples.json`.
+- For a full walkthrough of filters, generation prompts, injections, population specs, raking, and the multi-question loop, see [Persona Composition & Question Flow](docs/persona_overview.md).
 
 ### Dynamic persona slicing and synthesis
 
-- `persona_filters`: list of filter objects that slice the library at runtime. Each filter accepts `group`, `include.FIELD`, `exclude.FIELD`, `keywords`, `limit`, and optional `weight_share` (0-1) to reserve weight for the slice.
-- `persona_generations`: list of generation tasks where each task provides a `prompt`, optional `count`, `strategy` (`heuristic` or `openai`), `weight_share`, and `attributes.FIELD` overrides applied to every generated persona.
-- `persona_injections`: direct persona specifications (matching the `PersonaSpec` schema) with optional `weight_share`. These can be provided as inline objects or concise expressions in the CLI/Gradio UI.
-- `questions`: array of additional free-text questions. The primary intent question remains first; these extras are appended in order and reported separately in the response.
-- `population_spec`: one high-level object that can include a `base_group`, optional `persona_csv_path`, additional filters/generations/injections, and `marginals` + `raking` configuration. When present, it is evaluated after all other persona inputs and can “rake” the final audience to match demographic targets.
+- `persona_filters`: slice the library at runtime. Accepts `group`, `include.FIELD`, `exclude.FIELD`, `keywords`, `limit`, and optional `weight_share`.
+- `persona_generations`: create personas from prompts (with optional `count`, `strategy`, `attributes.FIELD`, `weight_share`).
+- `persona_injections`: supply explicit persona definitions and optional `weight_share`.
+- `questions`: additional survey questions; the intent question is always asked first.
+- `population_spec`: a reusable YAML/JSON bundle that can seed from a base group, extend with filters/generations/injections/CSVs, and optionally rake to match marginals.
 
 Example request snippet:
 
