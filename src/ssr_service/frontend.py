@@ -22,14 +22,14 @@ from .models import (
     coerce_http_url,
 )
 from .orchestrator import run_simulation
-from .personas import load_library
-from .sample_data import default_sample, get_sample_ids, load_sample
 from .persona_inputs import (
     parse_filter_expression,
     parse_generation_expression,
     parse_injection_payload,
     parse_population_spec_input,
 )
+from .personas import load_library
+from .sample_data import default_sample, get_sample_ids, load_sample
 
 SETTINGS = get_settings()
 PERSONA_LIBRARY = load_library(Path(SETTINGS.persona_library_path))

@@ -42,8 +42,8 @@ import yaml
 
 from ssr_service.config import get_settings
 from ssr_service.models import PersonaSpec, PopulationSpec
-from ssr_service.population import buckets_from_population_spec, rake_personas
 from ssr_service.personas import combine_persona_buckets, get_persona_library
+from ssr_service.population import buckets_from_population_spec, rake_personas
 
 
 def dump_csv(personas: Iterable[PersonaSpec], path: Path) -> None:
