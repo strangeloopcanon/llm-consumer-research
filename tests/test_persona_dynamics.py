@@ -13,7 +13,6 @@ from ssr_service.models import (
     PersonaGenerationTask,
     PersonaInjection,
     PersonaQuestionResult,
-    PersonaResult,
     PersonaSpec,
     PopulationSpec,
     RakingConfig,
@@ -21,9 +20,13 @@ from ssr_service.models import (
     SimulationRequest,
 )
 from ssr_service.orchestrator import run_simulation
-from ssr_service.population import rake_personas
 from ssr_service.persona_generation import synthesize_personas
-from ssr_service.personas import combine_persona_buckets, filter_personas, get_persona_library
+from ssr_service.personas import (
+    combine_persona_buckets,
+    filter_personas,
+    get_persona_library,
+)
+from ssr_service.population import rake_personas
 
 
 def test_filter_personas_by_age_and_keyword():
