@@ -136,6 +136,102 @@ All settings are loaded via `pydantic-settings`; `.env` in the repo root is resp
 - `options.total_n` + `options.stratified` (true) allocate respondents across personas in proportion to their weights.
 - `sample_id` (optional) lets you bootstrap a request from the demo scenarios in `demo_samples.json`.
 
+### Dynamic persona slicing and synthesis
+
+- `persona_filters`: list of filter objects that slice the library at runtime. Each filter accepts `group`, `include.FIELD`, `exclude.FIELD`, `keywords`, `limit`, and optional `weight_share` (0-1) to reserve weight for the slice.
+- `persona_generations`: list of generation tasks where each task provides a `prompt`, optional `count`, `strategy` (`heuristic` or `openai`), `weight_share`, and `attributes.FIELD` overrides applied to every generated persona.
+- `persona_injections`: direct persona specifications (matching the `PersonaSpec` schema) with optional `weight_share`. These can be provided as inline objects or concise expressions in the CLI/Gradio UI.
+- `population_spec`: one high-level object that can include a `base_group`, optional `persona_csv_path`, additional filters/generations/injections, and `marginals` + `raking` configuration. When present, it is evaluated after all other persona inputs and can “rake” the final audience to match demographic targets.
+
+Example request snippet:
+
+```json
+{
+  "persona_filters": [
+    {
+      "group": "us_toothpaste_buyers",
+      "include": {"age": ["25-44"]},
+      "keywords": ["family"],
+      "weight_share": 0.4
+    }
+  ],
+  "persona_generations": [
+    {
+      "prompt": "Eco-conscious professionals in coastal cities",
+      "count": 2,
+      "weight_share": 0.35,
+      "attributes": {"region": "US", "income": "Upper"}
+    }
+  ],
+  "persona_injections": [
+    {
+      "persona": {
+        "name": "Custom Segment",
+        "descriptors": ["subscription loyalist", "premium"],
+        "weight": 1.0
+      },
+      "weight_share": 0.25
+    }
+  ]
+}
+```
+
+CLI helpers mirror these structures:
+
+```bash
+python -m src.ssr_service.simple_cli \
+  --concept-text "Cold brew sachets with adaptogens" \
+  --persona-group us_toothpaste_buyers \
+  --persona-filter "include.age=25-44;share=0.4" \
+  --persona-generation "prompt=Eco professionals;count=2;share=0.35;attr.region=US" \
+  --persona-injection "name=Custom;descriptors=heavy user;share=0.25" \
+  --population-spec specs/genpop.yml \
+  --total-samples 200 --json
+```
+
+The Gradio dashboard exposes the same controls under **Advanced Persona Controls** so researchers can iterate without touching JSON.
+
+### Population spec (full audience control)
+
+`population_spec` accepts the following keys:
+
+- `base_group`: seed from a library group.
+- `persona_csv_path`: include an additional persona CSV.
+- `filters` / `generations` / `injections`: same shape as the request-level lists, each supporting `weight_share`.
+- `marginals`: target distributions (e.g., `{ "age": { "18-24": 0.12, ... } }`).
+- `raking`: `{ enabled: bool, mode: "lenient" | "strict", iterations: int }` to control iterative proportional fitting. `lenient` ignores missing categories; `strict` raises when the targets require unseen cells.
+
+Example YAML:
+
+```yaml
+base_group: us_toothpaste_buyers
+filters:
+  - group: us_toothpaste_buyers
+    include: { age: [25-44] }
+    weight_share: 0.5
+generations:
+  - prompt: Eco-conscious professionals
+    count: 2
+    weight_share: 0.3
+    attributes: { region: US }
+injections:
+  - persona:
+      name: Custom Segment
+      descriptors: [loyal, premium]
+      weight: 1.0
+    weight_share: 0.2
+marginals:
+  age: { "18-24": 0.12, "25-44": 0.36, "45-64": 0.32, "65+": 0.20 }
+raking:
+  enabled: true
+  mode: lenient
+  iterations: 25
+```
+
+- CLI/UI: point to the spec (`--population-spec path/to/spec.yml` or paste/upload in Gradio’s **Population Spec** fields).
+- API: populate the `population_spec` field directly with the structure above.
+- CSV Builder: `python scripts/build_persona_csv.py --spec spec.yml --output /tmp/personas.csv` uses the same schema and the shared raking logic. Feed the CSV into the CLI (`--persona-csv`) or API if you prefer a static artifact.
+
 ### Regenerating personas from ACS data
 
 If you need to refresh personas when new ACS releases drop:

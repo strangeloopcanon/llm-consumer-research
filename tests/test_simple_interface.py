@@ -9,8 +9,12 @@ import pytest
 from ssr_service import simple_interface
 from ssr_service.models import (
     LikertDistribution,
+    PersonaFilter,
+    PersonaGenerationTask,
+    PersonaInjection,
     PersonaResult,
     PersonaSpec,
+    PopulationSpec,
     SimulationRequest,
     SimulationResponse,
 )
@@ -81,3 +85,25 @@ def test_run_simple_simulation_monkeypatched(monkeypatch):
 
     assert response.aggregate.mean == 3.2
     assert captured["request"].concept.text == "A premium sparkling water."
+
+
+def test_build_simple_request_dynamic_personas():
+    persona_filter = PersonaFilter(include={"age": ["25-44"]}, weight_share=0.4)
+    persona_generation = PersonaGenerationTask(prompt="Eco travellers", count=1)
+    persona_injection = PersonaInjection(
+        persona=PersonaSpec(name="VIP"), weight_share=0.2
+    )
+    population_spec = PopulationSpec(base_group="us_toothpaste_buyers")
+
+    request = simple_interface.build_simple_request(
+        concept_text="Concept",
+        persona_filters=[persona_filter],
+        persona_generations=[persona_generation],
+        persona_injections=[persona_injection],
+        population_spec=population_spec,
+    )
+
+    assert request.persona_filters[0].include["age"] == ["25-44"]
+    assert request.persona_generations[0].prompt == "Eco travellers"
+    assert request.persona_injections[0].persona.name == "VIP"
+    assert request.population_spec == population_spec

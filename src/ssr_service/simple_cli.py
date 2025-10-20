@@ -5,8 +5,14 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, List
 
+from .persona_inputs import (
+    parse_filter_expression,
+    parse_generation_expression,
+    parse_injection_payload,
+    parse_population_spec_input,
+)
 from .simple_interface import run_simple_simulation
 
 
@@ -27,6 +33,37 @@ def _build_parser() -> argparse.ArgumentParser:
         "--persona-csv",
         type=Path,
         help="Path to a persona CSV file with columns like name,age,habits.",
+    )
+    parser.add_argument(
+        "--persona-filter",
+        action="append",
+        help=(
+            "Persona filter expression (e.g. 'group=us_toothpaste_buyers;"
+            "include.age=25-44;keyword=family;share=0.5'). Repeatable."
+        ),
+    )
+    parser.add_argument(
+        "--persona-generation",
+        action="append",
+        help=(
+            "Persona generation expression (e.g. 'prompt=Eco parents;count=2;"
+            "share=0.3;attr.region=US'). Repeatable."
+        ),
+    )
+    parser.add_argument(
+        "--persona-injection",
+        action="append",
+        help=(
+            "Custom persona definition as JSON, file path, or expression "
+            "(e.g. 'name=Custom;descriptors=loyal,premium;share=0.2')."
+        ),
+    )
+    parser.add_argument(
+        "--population-spec",
+        help=(
+            "Population spec as file path or inline YAML/JSON defining base group,"
+            " slices, generations, injections, and marginals."
+        ),
     )
     parser.add_argument(
         "--samples-per-persona",
@@ -99,6 +136,25 @@ def main() -> None:
     parser = _build_parser()
     args = parser.parse_args()
 
+    try:
+        persona_filters = [
+            parse_filter_expression(expr) for expr in (args.persona_filter or [])
+        ]
+        persona_generations = [
+            parse_generation_expression(expr)
+            for expr in (args.persona_generation or [])
+        ]
+        persona_injections = [
+            parse_injection_payload(expr) for expr in (args.persona_injection or [])
+        ]
+        population_spec = (
+            parse_population_spec_input(args.population_spec)
+            if args.population_spec
+            else None
+        )
+    except ValueError as exc:  # pragma: no cover - exercised via CLI usage
+        parser.error(str(exc))
+
     response = run_simple_simulation(
         concept_text=args.concept_text or "",
         concept_url=args.concept_url,
@@ -106,6 +162,10 @@ def main() -> None:
         price=args.price,
         persona_group=args.persona_group,
         persona_csv_path=args.persona_csv,
+        persona_filters=persona_filters,
+        persona_generations=persona_generations,
+        persona_injections=persona_injections,
+        population_spec=population_spec,
         samples_per_persona=args.samples_per_persona,
         total_samples=args.total_samples,
         stratified=not args.no_stratified,
