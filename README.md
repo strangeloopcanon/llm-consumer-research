@@ -127,6 +127,45 @@ All settings are loaded via `pydantic-settings`; `.env` in the repo root is resp
 - Sampling knobs: `options.n` (per-persona respondents), `options.total_n` + `options.stratified` for weighted allocation, and `sample_id` to load a demo scenario from `demo_samples.json`.
 - For a full walkthrough of filters, generation prompts, injections, population specs, raking, and the multi-question loop, see [Persona Composition & Question Flow](docs/persona_overview.md).
 
+#### Example scenarios for Gradio
+
+1. **Toothpaste concept with eco-conscious professionals**
+   - Sample Scenario: `Fjallraven - Foldsack No. 1 Backpack` (just to populate fields, then adjust).
+   - Concept Title: `RadiantSmile Whitening Toothpaste`
+   - Price: `$5.99`
+   - Description: copy/paste your product blurb.
+   - Persona Library Group: `us_toothpaste_buyers`
+   - Advanced Persona Controls:
+     - Persona Filters: `group=us_toothpaste_buyers;include.age=25-44;share=0.4`
+     - Persona Generation Prompts: `prompt=Eco-conscious professionals;count=2;share=0.3;attr.region=US`
+     - Persona Injections: `name=Loyal Subscriber;descriptors=subscription,auto-ship;share=0.2`
+     - Additional Questions:
+       - `What would convince you to switch from your current toothpaste?`
+   - Samples per Persona: `50`
+   - Total Samples: `200`
+   - Stratified Allocation: checked
+   - Custom Intent Question: `How likely would you be to purchase this toothpaste during your next grocery trip?`
+
+2. **Digital banking feature launch**
+   - Concept Title: `SpendSense - Automated Expense Coach`
+   - Price: `Subscription $4.99/month`
+   - Description: *"AI coach that monitors transactions across your linked accounts, flags anomalies, and gives weekly savings nudges tailored to your goals."*
+   - Persona Library Group: leave `(None)`
+   - Upload Persona CSV: optional (e.g., fintech personas you maintain).
+   - Advanced Persona Controls:
+     - Persona Filters: `include.region=US;include.age=25-44;share=0.35`
+     - Persona Generation Prompts:
+       - `prompt=Remote tech workers juggling multiple subscription services;count=2;share=0.25`
+       - `prompt=Gig economy professionals who manage irregular cash flow;count=1;share=0.15`
+     - Persona Injections: `name=Cash-Back Enthusiast;descriptors=reward hacker,card churner;share=0.15`
+     - Population Spec (optional): paste a YAML that includes raking to align income brackets.
+     - Additional Questions (one per line):
+       - `What concerns would you have about automated financial coaching?`
+       - `Which feature would make this subscription worth paying for?`
+   - Samples per Persona: `40`
+   - Total Samples: `240`
+   - Custom Intent Question: `How likely would you be to try SpendSense for the next three months?`
+
 ### Dynamic persona slicing and synthesis
 
 - `persona_filters`: slice the library at runtime. Accepts `group`, `include.FIELD`, `exclude.FIELD`, `keywords`, `limit`, and optional `weight_share`.
