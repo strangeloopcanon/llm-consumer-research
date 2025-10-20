@@ -13,8 +13,10 @@ from .elicitation import ElicitationClient, generate_batch
 from .models import (
     ConceptInput,
     LikertDistribution,
+    PersonaQuestionResult,
     PersonaResult,
     PersonaSpec,
+    QuestionAggregate,
     SimulationOptions,
     SimulationRequest,
     SimulationResponse,
@@ -126,10 +128,11 @@ async def _simulate_persona(
     persona: PersonaSpec,
     artifact: ConceptArtifact,
     question: str,
+    question_id: str,
     rater: SemanticSimilarityRater,
     client: ElicitationClient,
     draws: int,
-) -> Tuple[PersonaResult, np.ndarray]:
+) -> Tuple[PersonaQuestionResult, np.ndarray]:
     settings = get_settings()
     results = await generate_batch(
         client=client,
@@ -147,8 +150,9 @@ async def _simulate_persona(
     themes = _top_themes(cleaned)
 
     return (
-        PersonaResult(
-            persona=persona,
+        PersonaQuestionResult(
+            question_id=question_id,
+            question=question,
             distribution=distribution,
             rationales=cleaned,
             themes=themes,
@@ -307,41 +311,76 @@ async def run_simulation(request: SimulationRequest) -> SimulationResponse:
         raking_applied = bool(population_spec.marginals)
 
     draw_counts = _allocate_draws(personas, options)
-
-    persona_tasks = [
-        _simulate_persona(persona, artifact, question, rater, client, draws)
-        for persona, draws in zip(personas, draw_counts)
-    ]
-
-    persona_results: List[PersonaResult] = []
-    persona_pmfs: List[np.ndarray] = []
-
-    for result, pmfs in await asyncio.gather(*persona_tasks):
-        persona_results.append(result)
-        persona_pmfs.append(pmfs)
+    raw_questions = [q.strip() for q in request.questions if q.strip()]
+    question_texts = [question] + raw_questions if raw_questions else [question]
+    question_ids = [f"q{i + 1}" for i in range(len(question_texts))]
 
     ratings = rater.ratings()
-    weights = np.array([p.persona.weight for p in persona_results], dtype=float)
-    weights = weights / weights.sum()
+    weight_vector = np.array([p.weight for p in personas], dtype=float)
+    if weight_vector.sum() == 0:
+        weight_vector = np.ones(len(personas)) / len(personas)
+    else:
+        weight_vector = weight_vector / weight_vector.sum()
 
-    aggregate_pmf = np.zeros(len(ratings), dtype=float)
-    aggregate_samples = 0
-    all_means = []
-    for weight, persona_result, pmfs, draws in zip(
-        weights, persona_results, persona_pmfs, draw_counts
-    ):
-        aggregate_pmf += weight * pmfs.mean(axis=0)
-        aggregate_samples += draws
-        means = pmfs @ np.array(ratings)
-        all_means.append(means)
+    persona_question_results: List[List[PersonaQuestionResult]] = [
+        [] for _ in personas
+    ]
+    question_aggregates: List[QuestionAggregate] = []
+    question_ci_bounds: List[Tuple[float, float]] = []
 
-    aggregate_dist = _make_distribution(aggregate_pmf, ratings, aggregate_samples)
+    rating_vector = np.array(ratings)
 
-    mean_vals = np.concatenate(all_means)
-    ci_lower, ci_upper = _bootstrap_ci(mean_vals)
+    for qid, qtext in zip(question_ids, question_texts):
+        persona_tasks = [
+            _simulate_persona(persona, artifact, qtext, qid, rater, client, draws)
+            for persona, draws in zip(personas, draw_counts)
+        ]
+
+        gathered = await asyncio.gather(*persona_tasks)
+        persona_pmfs: List[np.ndarray] = []
+
+        for idx, (result, pmfs) in enumerate(gathered):
+            persona_question_results[idx].append(result)
+            persona_pmfs.append(pmfs)
+
+        aggregate_pmf = np.zeros(len(ratings), dtype=float)
+        aggregate_samples = 0
+        all_means = []
+        for weight, pmfs, draws in zip(
+            weight_vector, persona_pmfs, draw_counts
+        ):
+            aggregate_pmf += weight * pmfs.mean(axis=0)
+            aggregate_samples += draws
+            means = pmfs @ rating_vector
+            all_means.append(means)
+
+        aggregate_dist = _make_distribution(aggregate_pmf, ratings, aggregate_samples)
+        question_aggregates.append(
+            QuestionAggregate(question_id=qid, question=qtext, aggregate=aggregate_dist)
+        )
+
+        mean_vals = np.concatenate(all_means) if all_means else np.array([])
+        ci_lower, ci_upper = _bootstrap_ci(mean_vals)
+        question_ci_bounds.append((ci_lower, ci_upper))
+
+    persona_results: List[PersonaResult] = []
+    for persona, question_results in zip(personas, persona_question_results):
+        first_result = question_results[0]
+        persona_results.append(
+            PersonaResult(
+                persona=persona,
+                distribution=first_result.distribution,
+                rationales=first_result.rationales,
+                themes=first_result.themes,
+                question_results=question_results,
+            )
+        )
+
+    first_question_dist = question_aggregates[0].aggregate
+    ci_lower, ci_upper = question_ci_bounds[0]
 
     metadata: Dict[str, str] = {
-        "question": question,
+        "question": question_texts[0],
         "anchor_bank": anchor_file,
         "intent": intent,
         "description_length": str(len(artifact.description)),
@@ -350,7 +389,14 @@ async def run_simulation(request: SimulationRequest) -> SimulationResponse:
         "ci_mean_upper": f"{ci_upper:.3f}",
         "persona_summary": _summarize_personas(persona_results),
         "persona_total": str(len(personas)),
+        "question_count": str(len(question_texts)),
     }
+
+    for idx, qtext in enumerate(question_texts, start=1):
+        metadata[f"question_{idx}"] = qtext
+        lower, upper = question_ci_bounds[idx - 1]
+        metadata[f"ci_mean_lower_q{idx}"] = f"{lower:.3f}"
+        metadata[f"ci_mean_upper_q{idx}"] = f"{upper:.3f}"
 
     if request.sample_id:
         metadata["sample_id"] = request.sample_id
@@ -378,9 +424,10 @@ async def run_simulation(request: SimulationRequest) -> SimulationResponse:
                 metadata["population_spec_raking"] += f" ({population_spec.raking.iterations} iters)"
 
     return SimulationResponse(
-        aggregate=aggregate_dist,
+        aggregate=first_question_dist,
         personas=persona_results,
         metadata=metadata,
+        questions=question_aggregates,
     )
 
 

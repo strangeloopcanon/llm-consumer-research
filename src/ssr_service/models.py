@@ -262,6 +262,10 @@ class SimulationRequest(BaseModel):
     persona_csv: Optional[str] = Field(
         default=None, description="Raw CSV string defining personas"
     )
+    questions: List[str] = Field(
+        default_factory=list,
+        description="Optional list of survey questions to ask each persona in addition to the default intent question.",
+    )
     persona_filters: List[PersonaFilter] = Field(
         default_factory=list,
         description="Filters applied to the persona library to compose dynamic segments.",
@@ -294,28 +298,46 @@ class LikertDistribution(BaseModel):
     sample_n: int
 
 
+class PersonaQuestionResult(BaseModel):
+    question_id: str
+    question: str
+    distribution: LikertDistribution
+    rationales: List[str]
+    themes: List[str]
+
+
 class PersonaResult(BaseModel):
     persona: PersonaSpec
     distribution: LikertDistribution
     rationales: List[str]
     themes: List[str]
+    question_results: List[PersonaQuestionResult] = Field(default_factory=list)
+
+
+class QuestionAggregate(BaseModel):
+    question_id: str
+    question: str
+    aggregate: LikertDistribution
 
 
 class SimulationResponse(BaseModel):
     aggregate: LikertDistribution
     personas: List[PersonaResult]
     metadata: Dict[str, str] = Field(default_factory=dict)
+    questions: List[QuestionAggregate] = Field(default_factory=list)
 
 
 __all__ = [
     "ConceptInput",
     "LikertDistribution",
+    "QuestionAggregate",
     "PersonaResult",
     "PersonaSpec",
     "PersonaFilter",
     "PersonaTemplate",
     "PersonaGenerationTask",
     "PersonaInjection",
+    "PersonaQuestionResult",
     "PopulationSpec",
     "RakingConfig",
     "SimulationOptions",

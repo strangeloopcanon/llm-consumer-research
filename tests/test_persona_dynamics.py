@@ -12,6 +12,7 @@ from ssr_service.models import (
     PersonaFilter,
     PersonaGenerationTask,
     PersonaInjection,
+    PersonaQuestionResult,
     PersonaResult,
     PersonaSpec,
     PopulationSpec,
@@ -103,6 +104,7 @@ async def test_run_simulation_with_dynamic_personas(monkeypatch):
         persona: PersonaSpec,
         artifact,
         question: str,
+        question_id: str,
         rater,
         client,
         draws: int,
@@ -114,13 +116,15 @@ async def test_run_simulation_with_dynamic_personas(monkeypatch):
             top2box=0.4,
             sample_n=draws,
         )
+        question_result = PersonaQuestionResult(
+            question_id=question_id,
+            question=question,
+            distribution=distribution,
+            rationales=["sample rationale"],
+            themes=["focus"],
+        )
         return (
-            PersonaResult(
-                persona=persona,
-                distribution=distribution,
-                rationales=["sample rationale"],
-                themes=["focus"],
-            ),
+            question_result,
             np.array([[0.1, 0.2, 0.3, 0.25, 0.15]]),
         )
 
@@ -164,6 +168,8 @@ async def test_run_simulation_with_dynamic_personas(monkeypatch):
     assert "Custom Segment" in persona_names
     assert any("eco" in name.lower() or "generated" in name for name in persona_names)
     assert response.metadata.get("persona_total")
+    assert response.metadata.get("question_count") == "1"
+    assert len(response.questions) == 1
 
 
 def test_rake_personas_lenient_handles_missing_categories():
@@ -219,6 +225,7 @@ async def test_run_simulation_with_population_spec(monkeypatch):
         persona: PersonaSpec,
         artifact,
         question: str,
+        question_id: str,
         rater,
         client,
         draws: int,
@@ -230,13 +237,15 @@ async def test_run_simulation_with_population_spec(monkeypatch):
             top2box=0.4,
             sample_n=draws,
         )
+        question_result = PersonaQuestionResult(
+            question_id=question_id,
+            question=question,
+            distribution=distribution,
+            rationales=["sample rationale"],
+            themes=["focus"],
+        )
         return (
-            PersonaResult(
-                persona=persona,
-                distribution=distribution,
-                rationales=["sample rationale"],
-                themes=["focus"],
-            ),
+            question_result,
             np.array([[0.1, 0.2, 0.3, 0.25, 0.15]]),
         )
 
@@ -273,3 +282,5 @@ async def test_run_simulation_with_population_spec(monkeypatch):
     ages = [res.persona.age for res in response.personas if res.persona.age]
     assert ages, "Expected personas with age attributes"
     assert "population_spec" in response.metadata
+    assert response.metadata.get("question_count") == "1"
+    assert response.questions

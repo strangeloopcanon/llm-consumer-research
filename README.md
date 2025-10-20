@@ -141,6 +141,7 @@ All settings are loaded via `pydantic-settings`; `.env` in the repo root is resp
 - `persona_filters`: list of filter objects that slice the library at runtime. Each filter accepts `group`, `include.FIELD`, `exclude.FIELD`, `keywords`, `limit`, and optional `weight_share` (0-1) to reserve weight for the slice.
 - `persona_generations`: list of generation tasks where each task provides a `prompt`, optional `count`, `strategy` (`heuristic` or `openai`), `weight_share`, and `attributes.FIELD` overrides applied to every generated persona.
 - `persona_injections`: direct persona specifications (matching the `PersonaSpec` schema) with optional `weight_share`. These can be provided as inline objects or concise expressions in the CLI/Gradio UI.
+- `questions`: array of additional free-text questions. The primary intent question remains first; these extras are appended in order and reported separately in the response.
 - `population_spec`: one high-level object that can include a `base_group`, optional `persona_csv_path`, additional filters/generations/injections, and `marginals` + `raking` configuration. When present, it is evaluated after all other persona inputs and can “rake” the final audience to match demographic targets.
 
 Example request snippet:

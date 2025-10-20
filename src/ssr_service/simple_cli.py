@@ -59,6 +59,11 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--question",
+        action="append",
+        help="Additional question to ask (repeat flag for multiple questions).",
+    )
+    parser.add_argument(
         "--population-spec",
         help=(
             "Population spec as file path or inline YAML/JSON defining base group,"
@@ -152,6 +157,7 @@ def main() -> None:
             if args.population_spec
             else None
         )
+        questions = [q.strip() for q in (args.question or []) if q and q.strip()]
     except ValueError as exc:  # pragma: no cover - exercised via CLI usage
         parser.error(str(exc))
 
@@ -166,6 +172,7 @@ def main() -> None:
         persona_generations=persona_generations,
         persona_injections=persona_injections,
         population_spec=population_spec,
+        questions=questions,
         samples_per_persona=args.samples_per_persona,
         total_samples=args.total_samples,
         stratified=not args.no_stratified,
