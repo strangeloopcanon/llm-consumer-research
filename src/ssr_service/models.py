@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, List, Optional, Union, Literal
+from typing import Dict, List, Literal, Optional, Union
 
 from pydantic import BaseModel, Field, HttpUrl, TypeAdapter, ValidationError
 

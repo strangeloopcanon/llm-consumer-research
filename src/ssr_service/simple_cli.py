@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
-from typing import Any, List
+from typing import Any
 
 from .persona_inputs import (
     parse_filter_expression,
