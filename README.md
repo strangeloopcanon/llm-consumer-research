@@ -57,6 +57,12 @@ pip install -e .
 uvicorn ssr_service.api:app --host 0.0.0.0 --port 8000
 ```
 
+To launch the Gradio dashboard with the right environment in place:
+
+```bash
+make gradio  # expects OPENAI_API_KEY in your shell or .env
+```
+
 ### Example request
 
 ```bash
