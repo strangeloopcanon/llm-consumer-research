@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from collections import Counter
-from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -21,7 +20,14 @@ from .models import (
     SimulationResponse,
     coerce_http_url,
 )
-from .personas import ensure_weights, get_persona_group, personas_from_csv
+from .persona_generation import synthesize_personas
+from .personas import (
+    combine_persona_buckets,
+    filter_personas,
+    get_persona_library,
+    personas_from_csv,
+)
+from .population import buckets_from_population_spec, rake_personas
 from .retrieval import ConceptArtifact, ingest_concept
 from .sample_data import load_sample
 from .ssr import SemanticSimilarityRater, likert_metrics, load_rater
@@ -233,28 +239,72 @@ async def run_simulation(request: SimulationRequest) -> SimulationResponse:
 
     client = ElicitationClient(model_override=options.model)
 
-    personas: List[PersonaSpec] = list(request.personas)
-
+    library = get_persona_library(settings.persona_library_path)
     persona_group_source = None
-    if persona_group:
-        group = get_persona_group(
-            persona_group,
-            Path(settings.persona_library_path),
+    persona_buckets: List[Tuple[List[PersonaSpec], Optional[float]]] = []
+    population_spec = request.population_spec
+    population_spec_summary: Dict[str, str] = {}
+
+    if request.personas:
+        persona_buckets.append(
+            ([persona.model_copy(deep=True) for persona in request.personas], None)
         )
-        personas.extend(group.personas)
+
+    if persona_group:
+        group = library.get_group(persona_group)
         persona_group_source = group.source
+        persona_buckets.append(
+            ([persona.model_copy(deep=True) for persona in group.personas], None)
+        )
 
     if request.persona_csv:
-        personas.extend(personas_from_csv(request.persona_csv))
+        persona_buckets.append((personas_from_csv(request.persona_csv), None))
 
+    for injection in request.persona_injections:
+        persona = injection.persona.model_copy(deep=True)
+        persona_buckets.append(([persona], injection.weight_share))
+
+    for persona_filter in request.persona_filters:
+        effective_filter = persona_filter.model_copy(deep=True)
+        if effective_filter.group is None and persona_group:
+            effective_filter.group = persona_group
+        filtered = filter_personas(library, effective_filter)
+        if not filtered:
+            continue
+        persona_buckets.append((filtered, persona_filter.weight_share))
+
+    for generation in request.persona_generations:
+        generated = await synthesize_personas(generation, settings)
+        if not generated:
+            continue
+        persona_buckets.append((generated, generation.weight_share))
+
+    if population_spec:
+        spec_buckets = await buckets_from_population_spec(population_spec, library, settings)
+        if spec_buckets:
+            persona_buckets.extend(spec_buckets)
+        population_spec_summary = {
+            "base_group": population_spec.base_group or "",
+            "filters": str(len(population_spec.filters)),
+            "generations": str(len(population_spec.generations)),
+            "injections": str(len(population_spec.injections)),
+            "marginals": str(len(population_spec.marginals)),
+        }
+
+    if not persona_buckets:
+        default_persona = PersonaSpec(
+            name="General Consumer", descriptors=["broad audience"], weight=1.0
+        )
+        persona_buckets.append(([default_persona], None))
+
+    personas = combine_persona_buckets(persona_buckets)
     if not personas:
-        personas = [
-            PersonaSpec(
-                name="General Consumer", descriptors=["broad audience"], weight=1.0
-            )
-        ]
+        raise RuntimeError("No personas available after applying filters and generation.")
 
-    personas = ensure_weights(personas)
+    raking_applied = False
+    if population_spec and population_spec.raking.enabled:
+        personas = rake_personas(personas, population_spec.marginals, population_spec.raking)
+        raking_applied = bool(population_spec.marginals)
 
     draw_counts = _allocate_draws(personas, options)
 
@@ -299,6 +349,7 @@ async def run_simulation(request: SimulationRequest) -> SimulationResponse:
         "ci_mean_lower": f"{ci_lower:.3f}",
         "ci_mean_upper": f"{ci_upper:.3f}",
         "persona_summary": _summarize_personas(persona_results),
+        "persona_total": str(len(personas)),
     }
 
     if request.sample_id:
@@ -307,6 +358,24 @@ async def run_simulation(request: SimulationRequest) -> SimulationResponse:
         metadata["persona_group"] = persona_group
     if persona_group_source:
         metadata["persona_group_source"] = persona_group_source
+    if request.persona_filters:
+        metadata["persona_filters"] = str(len(request.persona_filters))
+    if request.persona_injections:
+        metadata["persona_injections"] = str(len(request.persona_injections))
+    if request.persona_generations:
+        metadata["persona_generations"] = ";".join(
+            task.prompt for task in request.persona_generations
+        )
+    if population_spec:
+        metadata["population_spec"] = ",".join(
+            f"{key}={value}" for key, value in population_spec_summary.items() if value
+        ) or "true"
+        if population_spec.raking.enabled:
+            metadata["population_spec_raking"] = population_spec.raking.mode
+            if not population_spec.marginals:
+                metadata["population_spec_raking"] += " (no marginals)"
+            elif raking_applied:
+                metadata["population_spec_raking"] += f" ({population_spec.raking.iterations} iters)"
 
     return SimulationResponse(
         aggregate=aggregate_dist,

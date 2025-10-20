@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -12,6 +13,9 @@ import pandas as pd
 from .config import get_settings
 from .models import (
     ConceptInput,
+    PersonaFilter,
+    PersonaGenerationTask,
+    PersonaInjection,
     SimulationOptions,
     SimulationRequest,
     SimulationResponse,
@@ -20,6 +24,12 @@ from .models import (
 from .orchestrator import run_simulation
 from .personas import load_library
 from .sample_data import default_sample, get_sample_ids, load_sample
+from .persona_inputs import (
+    parse_filter_expression,
+    parse_generation_expression,
+    parse_injection_payload,
+    parse_population_spec_input,
+)
 
 SETTINGS = get_settings()
 PERSONA_LIBRARY = load_library(Path(SETTINGS.persona_library_path))
@@ -131,6 +141,11 @@ async def simulate(
     sample_id: str,
     persona_group: str,
     persona_csv_file,
+    persona_filters_text: str,
+    persona_generations_text: str,
+    persona_injections_text: str,
+    population_spec_text: str,
+    population_spec_file,
     n_per_persona: int,
     total_n: int,
     stratified: bool,
@@ -159,10 +174,73 @@ async def simulate(
         persona_group if persona_group and persona_group != "(None)" else None
     )
 
+    persona_filters: List[PersonaFilter] = []
+    if persona_filters_text:
+        for line in persona_filters_text.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                persona_filters.append(parse_filter_expression(line))
+            except ValueError as exc:  # pragma: no cover - handled via UI feedback
+                raise gr.Error(f"Invalid persona filter: {exc}") from exc
+
+    persona_generations: List[PersonaGenerationTask] = []
+    if persona_generations_text:
+        for line in persona_generations_text.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                persona_generations.append(parse_generation_expression(line))
+            except ValueError as exc:  # pragma: no cover
+                raise gr.Error(f"Invalid persona generation: {exc}") from exc
+
+    persona_injections: List[PersonaInjection] = []
+    if persona_injections_text:
+        stripped = persona_injections_text.strip()
+        parsed = False
+        if stripped.startswith("["):
+            try:
+                payloads = json.loads(stripped)
+                for entry in payloads:
+                    persona_injections.append(
+                        parse_injection_payload(json.dumps(entry))
+                    )
+                parsed = True
+            except (ValueError, TypeError) as exc:  # pragma: no cover
+                raise gr.Error(f"Invalid persona injection JSON: {exc}") from exc
+        if not parsed:
+            for line in stripped.splitlines():
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    persona_injections.append(parse_injection_payload(line))
+                except ValueError as exc:  # pragma: no cover
+                    raise gr.Error(f"Invalid persona injection: {exc}") from exc
+
+    population_spec = None
+    spec_text: Optional[str] = None
+    if population_spec_file is not None:
+        spec_text = _read_file(population_spec_file)
+    elif population_spec_text:
+        spec_text = population_spec_text
+
+    if spec_text:
+        try:
+            population_spec = parse_population_spec_input(spec_text)
+        except ValueError as exc:  # pragma: no cover
+            raise gr.Error(f"Invalid population spec: {exc}") from exc
+
     request = SimulationRequest(
         concept=concept,
         persona_group=persona_group_value,
         persona_csv=persona_csv,
+        persona_filters=persona_filters,
+        persona_generations=persona_generations,
+        persona_injections=persona_injections,
+        population_spec=population_spec,
         sample_id=sample_id or None,
         intent_question=custom_question or None,
         options=options,
@@ -192,7 +270,12 @@ def _load_sample_fields(sample_id: str):
     )
 
 
-def launch() -> None:
+def launch(
+    *,
+    server_port: Optional[int] = None,
+    server_name: Optional[str] = None,
+    share: bool = False,
+) -> None:
     persona_options = ["(None)"] + list(PERSONA_LIBRARY.keys())
     sample_options = get_sample_ids()
     default_scenario = default_sample()
@@ -253,6 +336,43 @@ def launch() -> None:
             persona_csv_input = gr.File(
                 label="Upload Persona CSV",
                 file_types=[".csv"],
+                type="binary",
+            )
+
+        with gr.Accordion("Advanced Persona Controls", open=False):
+            gr.Markdown(
+                "Configure dynamic personas. Enter one expression per line."
+            )
+            persona_filter_input = gr.Textbox(
+                label="Persona Filters",
+                lines=3,
+                placeholder=(
+                    "Example: group=us_toothpaste_buyers;include.age=25-44;"
+                    "keyword=family;share=0.5"
+                ),
+            )
+            persona_generation_input = gr.Textbox(
+                label="Persona Generation Prompts",
+                lines=3,
+                placeholder=(
+                    "Example: prompt=Eco parents;count=2;share=0.3;attr.region=US"
+                ),
+            )
+            persona_injection_input = gr.Textbox(
+                label="Persona Injections",
+                lines=3,
+                placeholder=(
+                    "Example: name=Custom Segment;descriptors=loyal,premium;share=0.2"
+                ),
+            )
+            population_spec_input = gr.Textbox(
+                label="Population Spec (YAML/JSON)",
+                lines=4,
+                placeholder="Paste full spec to control base groups, marginals, and raking",
+            )
+            population_spec_file = gr.File(
+                label="Upload Population Spec",
+                file_types=[".yml", ".yaml", ".json"],
                 type="binary",
             )
 
@@ -320,6 +440,11 @@ def launch() -> None:
                 sample_dropdown,
                 persona_group_input,
                 persona_csv_input,
+                persona_filter_input,
+                persona_generation_input,
+                persona_injection_input,
+                population_spec_input,
+                population_spec_file,
                 n_input,
                 total_input,
                 stratified_input,
@@ -341,7 +466,15 @@ def launch() -> None:
             ],
         )
 
-    demo.launch()
+    launch_kwargs: Dict[str, Any] = {}
+    if server_port is not None:
+        launch_kwargs["server_port"] = server_port
+    if server_name is not None:
+        launch_kwargs["server_name"] = server_name
+    if share:
+        launch_kwargs["share"] = share
+
+    demo.launch(**launch_kwargs)
 
 
 __all__ = ["launch"]

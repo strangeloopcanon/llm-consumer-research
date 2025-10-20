@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Union
+from pathlib import Path
+from typing import Dict, List, Optional, Union, Literal
 
 from pydantic import BaseModel, Field, HttpUrl, TypeAdapter, ValidationError
 
@@ -88,6 +89,161 @@ class ConceptInput(BaseModel):
     price: Optional[str] = None
 
 
+class PersonaFilter(BaseModel):
+    """Filtering rules for selecting personas from the library."""
+
+    group: Optional[str] = Field(
+        default=None,
+        description="Restrict search to a specific persona group; falls back to entire library when omitted.",
+    )
+    include: Dict[str, List[str]] = Field(
+        default_factory=dict,
+        description="Field -> allowed values (case-insensitive). Matches any of the listed values.",
+    )
+    exclude: Dict[str, List[str]] = Field(
+        default_factory=dict,
+        description="Field -> disallowed values (case-insensitive). Reject personas containing these values.",
+    )
+    keywords: List[str] = Field(
+        default_factory=list,
+        description="Free-text keywords that must appear in at least one descriptive field.",
+    )
+    limit: Optional[int] = Field(
+        default=None,
+        ge=1,
+        description="Cap the number of personas returned after filtering.",
+    )
+    weight_share: Optional[float] = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="Optional portion of total weight to allocate to this slice.",
+    )
+
+
+class PersonaTemplate(BaseModel):
+    """Template that can be converted into a PersonaSpec."""
+
+    name: Optional[str] = None
+    age: Optional[str] = None
+    gender: Optional[str] = None
+    income: Optional[str] = None
+    region: Optional[str] = None
+    occupation: Optional[str] = None
+    education: Optional[str] = None
+    household: Optional[str] = None
+    purchase_frequency: Optional[str] = Field(default=None, alias="purchase_freq")
+    usage_context: Optional[str] = Field(default=None, alias="usage")
+    background: Optional[str] = None
+    habits: List[str] = Field(default_factory=list)
+    motivations: List[str] = Field(default_factory=list)
+    pain_points: List[str] = Field(default_factory=list)
+    preferred_channels: List[str] = Field(default_factory=list)
+    descriptors: List[str] = Field(default_factory=list)
+    notes: Optional[str] = None
+    source: Optional[str] = None
+    weight: Optional[float] = Field(default=None, ge=0.0)
+
+    def to_persona_spec(self, fallback_name: str) -> PersonaSpec:
+        """Convert the template into a PersonaSpec, applying defaults as needed."""
+
+        persona_data: Dict[str, Union[str, List[str], float, None]] = {
+            "name": self.name or fallback_name,
+            "age": self.age,
+            "gender": self.gender,
+            "income": self.income,
+            "region": self.region,
+            "occupation": self.occupation,
+            "education": self.education,
+            "household": self.household,
+            "purchase_frequency": self.purchase_frequency,
+            "usage_context": self.usage_context,
+            "background": self.background,
+            "habits": self.habits,
+            "motivations": self.motivations,
+            "pain_points": self.pain_points,
+            "preferred_channels": self.preferred_channels,
+            "descriptors": self.descriptors,
+            "notes": self.notes,
+            "source": self.source,
+            "weight": self.weight or 1.0,
+        }
+        return PersonaSpec.model_validate(persona_data)
+
+
+class PersonaGenerationTask(BaseModel):
+    """Instruction for synthesising personas programmatically."""
+
+    prompt: str = Field(
+        description="Free-form description of the audience slice to generate."
+    )
+    count: int = Field(
+        default=3,
+        ge=1,
+        le=20,
+        description="Number of personas to synthesise from the prompt.",
+    )
+    strategy: Literal["heuristic", "openai"] = Field(
+        default="heuristic",
+        description="Generation backend to use; heuristic is offline and deterministic.",
+    )
+    weight_share: Optional[float] = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="Optional share of total weight reserved for generated personas.",
+    )
+    attributes: Dict[str, str] = Field(
+        default_factory=dict,
+        description="Attribute overrides applied to every generated persona (e.g. region=US).",
+    )
+    templates: List[PersonaTemplate] = Field(
+        default_factory=list,
+        description="Optional explicit templates to seed the generator; missing values are filled heuristically.",
+    )
+
+
+class PersonaInjection(BaseModel):
+    """Directly inject a persona specification into the simulation."""
+
+    persona: PersonaSpec
+    weight_share: Optional[float] = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="Optional share of total weight reserved for this injection.",
+    )
+
+
+class RakingConfig(BaseModel):
+    """Configuration for demographic raking."""
+
+    enabled: bool = False
+    mode: Literal["lenient", "strict"] = "lenient"
+    iterations: int = Field(default=20, ge=1, le=200)
+
+
+class PopulationSpec(BaseModel):
+    """High-level specification for composing a target population."""
+
+    base_group: Optional[str] = Field(
+        default=None,
+        description="Optional persona library group to seed the population.",
+    )
+    persona_csv_path: Optional[Path] = Field(
+        default=None,
+        description="Optional path to a persona CSV to include as a bucket.",
+    )
+    filters: List[PersonaFilter] = Field(default_factory=list)
+    generations: List[PersonaGenerationTask] = Field(default_factory=list)
+    injections: List[PersonaInjection] = Field(default_factory=list)
+    marginals: Dict[str, Dict[str, float]] = Field(
+        default_factory=dict,
+        description="Optional marginal distributions for raking (field -> category -> share).",
+    )
+    raking: RakingConfig = Field(default_factory=RakingConfig)
+
+
 class SimulationOptions(BaseModel):
     n: int = Field(default=200, ge=1)
     model: Optional[str] = None
@@ -106,12 +262,28 @@ class SimulationRequest(BaseModel):
     persona_csv: Optional[str] = Field(
         default=None, description="Raw CSV string defining personas"
     )
+    persona_filters: List[PersonaFilter] = Field(
+        default_factory=list,
+        description="Filters applied to the persona library to compose dynamic segments.",
+    )
+    persona_injections: List[PersonaInjection] = Field(
+        default_factory=list,
+        description="Explicit personas added to the request before normalization.",
+    )
+    persona_generations: List[PersonaGenerationTask] = Field(
+        default_factory=list,
+        description="Prompt-driven persona generation tasks evaluated before simulation.",
+    )
     sample_id: Optional[str] = Field(
         default=None, description="Name of built-in sample scenario"
     )
     intent: str = Field(default="purchase_intent")
     intent_question: Optional[str] = None
     options: SimulationOptions = Field(default_factory=SimulationOptions)
+    population_spec: Optional[PopulationSpec] = Field(
+        default=None,
+        description="High-level population definition evaluated after other persona inputs.",
+    )
 
 
 class LikertDistribution(BaseModel):
@@ -140,6 +312,12 @@ __all__ = [
     "LikertDistribution",
     "PersonaResult",
     "PersonaSpec",
+    "PersonaFilter",
+    "PersonaTemplate",
+    "PersonaGenerationTask",
+    "PersonaInjection",
+    "PopulationSpec",
+    "RakingConfig",
     "SimulationOptions",
     "SimulationRequest",
     "SimulationResponse",

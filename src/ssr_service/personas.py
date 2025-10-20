@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import csv
 from dataclasses import dataclass
+from functools import lru_cache
 from io import StringIO
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional, TextIO, Union
+from typing import Dict, Iterable, List, Optional, TextIO, Tuple, Union
 
 import yaml
 
-from .models import PersonaSpec
+from .models import PersonaFilter, PersonaSpec
 
 
 @dataclass(slots=True)
@@ -97,18 +98,151 @@ def load_persona_group(path: Path) -> PersonaGroup:
 
 def load_library(directory: Path) -> Dict[str, PersonaGroup]:
     library: Dict[str, PersonaGroup] = {}
-    for file in directory.glob("*.yml"):
+    for file in sorted(directory.glob("*.yml")):
         group = load_persona_group(file)
         library[group.name] = group
     return library
 
 
+class PersonaLibrary:
+    """Cached access to persona groups stored on disk."""
+
+    def __init__(self, directory: Path):
+        self._directory = directory
+        self._groups: Dict[str, PersonaGroup] = {}
+        self.reload()
+
+    def reload(self) -> None:
+        self._groups = load_library(self._directory)
+
+    @property
+    def directory(self) -> Path:
+        return self._directory
+
+    def groups(self) -> Dict[str, PersonaGroup]:
+        return dict(self._groups)
+
+    def get_group(self, name: str) -> PersonaGroup:
+        try:
+            return self._groups[name]
+        except KeyError:
+            self.reload()
+            try:
+                return self._groups[name]
+            except KeyError as exc:  # pragma: no cover - defensive path
+                raise KeyError(
+                    f"Persona group '{name}' not found in {self._directory}"
+                ) from exc
+
+    def list_personas(self, group: Optional[str] = None) -> List[PersonaSpec]:
+        if group:
+            return [
+                persona.model_copy(deep=True)
+                for persona in self.get_group(group).personas
+            ]
+        personas: List[PersonaSpec] = []
+        for grp in self._groups.values():
+            personas.extend(p.model_copy(deep=True) for p in grp.personas)
+        return personas
+
+
+@lru_cache(maxsize=8)
+def get_persona_library(directory: str) -> PersonaLibrary:
+    """Return a cached PersonaLibrary for the provided directory path."""
+
+    return PersonaLibrary(Path(directory))
+
+
+def refresh_persona_library(directory: str) -> None:
+    """Clear the cached PersonaLibrary for hot-reload scenarios."""
+
+    _ = directory  # retained for API symmetry
+    get_persona_library.cache_clear()
+
+
 def get_persona_group(name: str, directory: Path) -> PersonaGroup:
-    for file in directory.glob("*.yml"):
-        group = load_persona_group(file)
-        if group.name == name:
-            return group
-    raise KeyError(f"Persona group '{name}' not found in {directory}")
+    library = get_persona_library(str(directory))
+    return library.get_group(name)
+
+
+def _normalise_values(values: Iterable[str]) -> List[str]:
+    normalised: List[str] = []
+    for value in values:
+        if value is None:
+            continue
+        cleaned = str(value).strip().lower()
+        if cleaned:
+            normalised.append(cleaned)
+    return normalised
+
+
+def _persona_field_values(persona: PersonaSpec, field: str) -> List[str]:
+    if not hasattr(persona, field):
+        return []
+    raw = getattr(persona, field)
+    if raw is None:
+        return []
+    if isinstance(raw, list):
+        return _normalise_values(raw)
+    return _normalise_values([raw])
+
+
+def _persona_search_blob(persona: PersonaSpec) -> str:
+    parts = [
+        persona.name,
+        persona.background or "",
+        persona.notes or "",
+        persona.describe(),
+        " ".join(persona.descriptors),
+        " ".join(persona.habits),
+        " ".join(persona.motivations),
+        " ".join(persona.pain_points),
+        " ".join(persona.preferred_channels),
+    ]
+    return " ".join(filter(None, parts)).lower()
+
+
+def filter_personas(
+    library: PersonaLibrary, persona_filter: PersonaFilter
+) -> List[PersonaSpec]:
+    """Return personas that satisfy the provided filter."""
+
+    candidates = library.list_personas(persona_filter.group)
+    include = {k: set(_normalise_values(v)) for k, v in persona_filter.include.items()}
+    exclude = {k: set(_normalise_values(v)) for k, v in persona_filter.exclude.items()}
+    keywords = [kw.strip().lower() for kw in persona_filter.keywords if kw.strip()]
+
+    matches: List[PersonaSpec] = []
+    for persona in candidates:
+        include_ok = True
+        for field, allowed in include.items():
+            values = set(_persona_field_values(persona, field))
+            if not values & allowed:
+                include_ok = False
+                break
+        if not include_ok:
+            continue
+
+        exclude_hit = False
+        for field, banned in exclude.items():
+            values = set(_persona_field_values(persona, field))
+            if values & banned:
+                exclude_hit = True
+                break
+        if exclude_hit:
+            continue
+
+        if keywords:
+            blob = _persona_search_blob(persona)
+            if any(keyword not in blob for keyword in keywords):
+                continue
+
+        matches.append(persona.model_copy(deep=True))
+
+    if persona_filter.limit:
+        matches = matches[: persona_filter.limit]
+
+    return matches
 
 
 def personas_from_csv(
@@ -161,25 +295,106 @@ def personas_from_csv(
     return personas
 
 
-def ensure_weights(personas: Iterable[PersonaSpec]) -> List[PersonaSpec]:
-    personas_list = list(personas)
-    total = sum(p.weight for p in personas_list)
+def ensure_weights(
+    personas: Iterable[PersonaSpec], target_total: float = 1.0
+) -> List[PersonaSpec]:
+    personas_list = [p for p in personas]
+    total = sum(max(p.weight, 0.0) for p in personas_list)
     if total <= 0:
         n = len(personas_list)
+        if n == 0:
+            return personas_list
+        equal = target_total / max(n, 1)
         for p in personas_list:
-            p.weight = 1.0 / max(n, 1)
+            p.weight = equal
         return personas_list
 
+    if target_total <= 0:
+        for p in personas_list:
+            p.weight = 0.0
+        return personas_list
+
+    scale = target_total / total
     for p in personas_list:
-        p.weight = p.weight / total
+        p.weight = max(p.weight, 0.0) * scale
     return personas_list
 
 
+PersonaBucket = Tuple[List[PersonaSpec], Optional[float]]
+
+
+def combine_persona_buckets(buckets: Iterable[PersonaBucket]) -> List[PersonaSpec]:
+    """Blend persona lists into a single normalised set.
+
+    Each bucket is a tuple of (personas, weight_share). When weight_share is provided,
+    the personas within that bucket are normalised to the requested share. Buckets
+    without a share divide the remaining weight proportionally.
+    """
+
+    buckets_list = [(list(personas), share) for personas, share in buckets]
+    specified = [(ps, share) for ps, share in buckets_list if share is not None]
+    unspecified = [(ps, share) for ps, share in buckets_list if share is None]
+
+    specified_total = sum(share for _, share in specified)
+    if specified_total > 1.0 + 1e-6:
+        raise ValueError(
+            "Persona weight shares exceed 1.0; adjust weight_share values to fit."
+        )
+
+    combined: Dict[str, PersonaSpec] = {}
+
+    def _accumulate(persona_list: List[PersonaSpec]) -> None:
+        for persona in persona_list:
+            existing = combined.get(persona.name)
+            if existing:
+                existing.weight += persona.weight
+            else:
+                combined[persona.name] = persona
+
+    for personas, share in specified:
+        if not personas:
+            continue
+        prepared = ensure_weights(
+            [p.model_copy(deep=True) for p in personas], target_total=share or 0.0
+        )
+        _accumulate(prepared)
+
+    if unspecified:
+        remaining = max(1.0 - specified_total, 0.0)
+        raw_total = sum(
+            sum(max(p.weight, 0.0) for p in persons) for persons, _ in unspecified
+        )
+        if remaining > 0 and raw_total > 0:
+            for personas, _ in unspecified:
+                bucket_weight = sum(max(p.weight, 0.0) for p in personas)
+                share = remaining * (bucket_weight / raw_total) if bucket_weight else 0.0
+                prepared = ensure_weights(
+                    [p.model_copy(deep=True) for p in personas], target_total=share
+                )
+                _accumulate(prepared)
+        # If no remaining share is available, the unspecified buckets are ignored.
+
+    final_personas = list(combined.values())
+    total_weight = sum(max(p.weight, 0.0) for p in final_personas)
+    if total_weight <= 0:
+        return final_personas
+
+    scale = 1.0 / total_weight
+    for persona in final_personas:
+        persona.weight = max(persona.weight, 0.0) * scale
+    return final_personas
+
+
 __all__ = [
+    "PersonaBucket",
     "PersonaGroup",
-    "load_persona_group",
-    "load_library",
-    "get_persona_group",
-    "personas_from_csv",
+    "PersonaLibrary",
+    "combine_persona_buckets",
     "ensure_weights",
+    "filter_personas",
+    "get_persona_group",
+    "get_persona_library",
+    "load_library",
+    "load_persona_group",
+    "personas_from_csv",
 ]
