@@ -8,11 +8,9 @@ import pytest
 from ssr_service.config import AppSettings
 from ssr_service.models import (
     ConceptInput,
-    LikertDistribution,
     PersonaFilter,
     PersonaGenerationTask,
     PersonaInjection,
-    PersonaQuestionResult,
     PersonaSpec,
     PopulationSpec,
     RakingConfig,
