@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from typing import Optional
 
-from .base import LLMProvider
-from .openai_client import OpenAIProvider
 from .anthropic_client import AnthropicProvider
+from .base import LLMProvider
 from .gemini_client import GeminiProvider
+from .openai_client import OpenAIProvider
 from .perplexity_client import PerplexityProvider
 
 

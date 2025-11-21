@@ -1,9 +1,10 @@
 """Verification tests for multi-model simulation."""
 
 import os
-from unittest.mock import MagicMock, patch, AsyncMock
-import pytest
+from unittest.mock import AsyncMock, MagicMock, patch
+
 import numpy as np
+import pytest
 
 from ssr_service.models import (
     ConceptInput,
@@ -12,6 +13,7 @@ from ssr_service.models import (
     SimulationRequest,
 )
 from ssr_service.orchestrator import run_simulation
+
 
 @pytest.mark.asyncio
 @patch("ssr_service.llm.openai_client.AsyncOpenAI")

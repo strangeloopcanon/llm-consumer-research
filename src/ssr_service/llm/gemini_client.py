@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Optional
 
 import google.generativeai as genai
-from google.generativeai.types import HarmCategory, HarmBlockThreshold
+from google.generativeai.types import HarmBlockThreshold, HarmCategory
 
 from ..cache import add_to_cache, get_from_cache
 from ..config import get_settings

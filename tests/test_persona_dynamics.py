@@ -81,9 +81,16 @@ async def test_synthesize_personas_openai_fallback_without_credentials():
 
 @pytest.mark.asyncio
 async def test_run_simulation_with_dynamic_personas(monkeypatch):
-    class DummyClient:
-        def __init__(self, *args, **kwargs):
-            pass
+    class DummyProvider:
+        provider_name = "dummy"
+        
+        async def generate_rationale(self, persona, prompt_block, question, seed=None, temperature=None):
+            from ssr_service.llm.base import LLMResponse
+            return LLMResponse(
+                rationale="sample rationale",
+                provider="dummy",
+                model="dummy-model"
+            )
 
     async def fake_ingest_concept(concept: ConceptInput):
         class Artifact:
@@ -100,43 +107,16 @@ async def test_run_simulation_with_dynamic_personas(monkeypatch):
             @staticmethod
             def ratings() -> list[int]:
                 return [1, 2, 3, 4, 5]
+            
+            @staticmethod
+            def score_text(text: str) -> np.ndarray:
+                return np.array([0.1, 0.2, 0.3, 0.25, 0.15])
 
         return Rater()
 
-    async def fake_simulate_persona(  # type: ignore[override]
-        persona: PersonaSpec,
-        artifact,
-        question: str,
-        question_id: str,
-        rater,
-        client,
-        draws: int,
-    ):
-        distribution = LikertDistribution(
-            ratings=[1, 2, 3, 4, 5],
-            pmf=[0.1, 0.2, 0.3, 0.25, 0.15],
-            mean=3.25,
-            top2box=0.4,
-            sample_n=draws,
-        )
-        question_result = PersonaQuestionResult(
-            question_id=question_id,
-            question=question,
-            distribution=distribution,
-            rationales=["sample rationale"],
-            themes=["focus"],
-        )
-        return (
-            question_result,
-            np.array([[0.1, 0.2, 0.3, 0.25, 0.15]]),
-        )
-
-    monkeypatch.setattr("ssr_service.orchestrator.ElicitationClient", DummyClient)
+    monkeypatch.setattr("ssr_service.orchestrator.get_provider", lambda name, model_override=None: DummyProvider())
     monkeypatch.setattr("ssr_service.orchestrator.ingest_concept", fake_ingest_concept)
     monkeypatch.setattr("ssr_service.orchestrator.load_rater", fake_load_rater)
-    monkeypatch.setattr(
-        "ssr_service.orchestrator._simulate_persona", fake_simulate_persona
-    )
 
     request = SimulationRequest(
         concept=ConceptInput(text="Concept for dynamic personas"),
@@ -202,9 +182,16 @@ def test_rake_personas_strict_raises_on_missing_cells():
 
 @pytest.mark.asyncio
 async def test_run_simulation_with_population_spec(monkeypatch):
-    class DummyClient:
-        def __init__(self, *args, **kwargs):
-            pass
+    class DummyProvider:
+        provider_name = "dummy"
+        
+        async def generate_rationale(self, persona, prompt_block, question, seed=None, temperature=None):
+            from ssr_service.llm.base import LLMResponse
+            return LLMResponse(
+                rationale="sample rationale",
+                provider="dummy",
+                model="dummy-model"
+            )
 
     async def fake_ingest_concept(concept: ConceptInput):
         class Artifact:
@@ -221,43 +208,16 @@ async def test_run_simulation_with_population_spec(monkeypatch):
             @staticmethod
             def ratings() -> list[int]:
                 return [1, 2, 3, 4, 5]
+            
+            @staticmethod
+            def score_text(text: str) -> np.ndarray:
+                return np.array([0.1, 0.2, 0.3, 0.25, 0.15])
 
         return Rater()
 
-    async def fake_simulate_persona(  # type: ignore[override]
-        persona: PersonaSpec,
-        artifact,
-        question: str,
-        question_id: str,
-        rater,
-        client,
-        draws: int,
-    ):
-        distribution = LikertDistribution(
-            ratings=[1, 2, 3, 4, 5],
-            pmf=[0.1, 0.2, 0.3, 0.25, 0.15],
-            mean=3.25,
-            top2box=0.4,
-            sample_n=draws,
-        )
-        question_result = PersonaQuestionResult(
-            question_id=question_id,
-            question=question,
-            distribution=distribution,
-            rationales=["sample rationale"],
-            themes=["focus"],
-        )
-        return (
-            question_result,
-            np.array([[0.1, 0.2, 0.3, 0.25, 0.15]]),
-        )
-
-    monkeypatch.setattr("ssr_service.orchestrator.ElicitationClient", DummyClient)
+    monkeypatch.setattr("ssr_service.orchestrator.get_provider", lambda name, model_override=None: DummyProvider())
     monkeypatch.setattr("ssr_service.orchestrator.ingest_concept", fake_ingest_concept)
     monkeypatch.setattr("ssr_service.orchestrator.load_rater", fake_load_rater)
-    monkeypatch.setattr(
-        "ssr_service.orchestrator._simulate_persona", fake_simulate_persona
-    )
 
     population_spec = PopulationSpec(
         base_group="us_toothpaste_buyers",
