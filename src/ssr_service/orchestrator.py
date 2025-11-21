@@ -9,7 +9,8 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 
 from .config import get_settings
-from .elicitation import ElicitationClient, generate_batch
+from .llm.base import LLMProvider, LLMResponse
+from .llm.factory import get_provider
 from .models import (
     ConceptInput,
     LikertDistribution,
@@ -124,26 +125,101 @@ def _summarize_personas(persona_results: List[PersonaResult]) -> str:
     return " | ".join(segments)
 
 
+async def generate_batch(
+    provider: LLMProvider,
+    persona: PersonaSpec,
+    prompt_block: str,
+    question: str,
+    n: int,
+    concurrency: int = 32,
+    temperature: Optional[float] = None,
+) -> List[LLMResponse]:
+    semaphore = asyncio.Semaphore(concurrency)
+    results: List[LLMResponse] = []
+
+    async def run_single(idx: int) -> None:
+        async with semaphore:
+            try:
+                res = await provider.generate_rationale(
+                    persona=persona,
+                    prompt_block=prompt_block,
+                    question=question,
+                    seed=idx,
+                    temperature=temperature,
+                )
+                results.append(res)
+            except Exception as err:  # noqa: BLE001
+                # One retry in case of transient API issues
+                try:
+                    res = await provider.generate_rationale(
+                        persona=persona,
+                        prompt_block=prompt_block,
+                        question=question,
+                        seed=idx,
+                        temperature=temperature,
+                    )
+                    results.append(res)
+                except Exception as inner_err:  # noqa: BLE001
+                    raise RuntimeError(
+                        "Failed to elicit rationale for persona "
+                        f"{persona.name} with {provider.provider_name}: {inner_err}"
+                    ) from err
+
+    await asyncio.gather(*(run_single(i) for i in range(n)))
+    return results
+
+
 async def _simulate_persona(
     persona: PersonaSpec,
     artifact: ConceptArtifact,
     question: str,
     question_id: str,
     rater: SemanticSimilarityRater,
-    client: ElicitationClient,
+    providers: List[LLMProvider],
     draws: int,
+    options: SimulationOptions,
 ) -> Tuple[PersonaQuestionResult, np.ndarray]:
     settings = get_settings()
-    results = await generate_batch(
-        client=client,
-        persona=persona,
-        prompt_block=artifact.as_prompt_block(),
-        question=question,
-        n=draws,
-        concurrency=min(settings.max_concurrency, 64),
-    )
+    
+    # Distribute draws across providers
+    # Simple strategy: split evenly, or just use the first one if only one
+    # If multiple providers, we might want to run 'draws' for EACH provider, or split 'draws' among them.
+    # The prompt implies "create queries against multiple LLMs... and capture the responses".
+    # Let's assume we want 'draws' responses TOTAL, split across providers.
+    
+    if not providers:
+        raise ValueError("No LLM providers configured")
 
-    cleaned = [_clean_rationale(res.rationale) for res in results]
+    draws_per_provider = draws // len(providers)
+    remainder = draws % len(providers)
+    
+    all_results: List[LLMResponse] = []
+    
+    prompt_block = artifact.as_prompt_block()
+    if options.additional_instructions:
+        prompt_block += f"\n\nAdditional Instructions:\n{options.additional_instructions}"
+
+    tasks = []
+    for i, provider in enumerate(providers):
+        count = draws_per_provider + (1 if i < remainder else 0)
+        if count > 0:
+            tasks.append(
+                generate_batch(
+                    provider=provider,
+                    persona=persona,
+                    prompt_block=prompt_block,
+                    question=question,
+                    n=count,
+                    concurrency=min(settings.max_concurrency, 64),
+                    temperature=options.temperature,
+                )
+            )
+    
+    provider_results_list = await asyncio.gather(*tasks)
+    for res_list in provider_results_list:
+        all_results.extend(res_list)
+
+    cleaned = [_clean_rationale(res.rationale) for res in all_results]
     pmfs = np.vstack([rater.score_text(text) for text in cleaned])
     persona_pmf = pmfs.mean(axis=0)
     distribution = _make_distribution(persona_pmf, rater.ratings(), sample_n=draws)
@@ -229,6 +305,10 @@ async def run_simulation(request: SimulationRequest) -> SimulationResponse:
         persona_group = persona_group or sample.persona_group
         if not intent_question_override and sample.intent_question:
             intent_question_override = sample.intent_question
+            
+    # Initialize providers
+    provider_names = options.providers or ["openai"]
+    providers = [get_provider(name, model_override=options.model) for name in provider_names]
 
     artifact = await ingest_concept(concept_input)
     anchor_file = request.options.anchor_bank or "purchase_intent_en.yml"
@@ -240,8 +320,6 @@ async def run_simulation(request: SimulationRequest) -> SimulationResponse:
         or options.intent_question
         or _default_question(intent)
     )
-
-    client = ElicitationClient(model_override=options.model)
 
     library = get_persona_library(settings.persona_library_path)
     persona_group_source = None
@@ -332,7 +410,7 @@ async def run_simulation(request: SimulationRequest) -> SimulationResponse:
 
     for qid, qtext in zip(question_ids, question_texts):
         persona_tasks = [
-            _simulate_persona(persona, artifact, qtext, qid, rater, client, draws)
+            _simulate_persona(persona, artifact, qtext, qid, rater, providers, draws, options)
             for persona, draws in zip(personas, draw_counts)
         ]
 
@@ -390,6 +468,7 @@ async def run_simulation(request: SimulationRequest) -> SimulationResponse:
         "persona_summary": _summarize_personas(persona_results),
         "persona_total": str(len(personas)),
         "question_count": str(len(question_texts)),
+        "providers": ",".join(p.provider_name for p in providers),
     }
 
     for idx, qtext in enumerate(question_texts, start=1):

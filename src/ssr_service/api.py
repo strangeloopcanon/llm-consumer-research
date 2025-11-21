@@ -5,12 +5,21 @@ from __future__ import annotations
 import logging
 
 from fastapi import Depends, FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 
 from .config import AppSettings, get_settings
 from .models import SimulationRequest, SimulationResponse
 from .orchestrator import run_simulation
 
 app = FastAPI(title="SSR Synthetic Consumer Research", version="0.1.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # For development convenience
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/health")

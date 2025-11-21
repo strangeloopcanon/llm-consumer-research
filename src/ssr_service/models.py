@@ -180,7 +180,7 @@ class PersonaGenerationTask(BaseModel):
     count: int = Field(
         default=3,
         ge=1,
-        le=20,
+        le=100,
         description="Number of personas to synthesise from the prompt.",
     )
     strategy: Literal["heuristic", "openai"] = Field(
@@ -253,6 +253,9 @@ class SimulationOptions(BaseModel):
     intent_question: Optional[str] = Field(default=None)
     total_n: Optional[int] = Field(default=None, ge=1)
     stratified: bool = Field(default=False)
+    providers: List[str] = Field(default_factory=lambda: ["openai"])
+    temperature: Optional[float] = Field(default=None, ge=0.0, le=2.0)
+    additional_instructions: Optional[str] = None
 
 
 class SimulationRequest(BaseModel):

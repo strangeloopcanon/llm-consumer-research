@@ -1,4 +1,4 @@
-.PHONY: setup ensure-venv check test llm-live deps-audit all gradio
+.PHONY: setup ensure-venv check test llm-live deps-audit all
 
 PYTHON_BIN ?= python3.11
 VENV ?= .venv311
@@ -37,19 +37,3 @@ deps-audit: ensure-venv
 	$(PIP_AUDIT) $(PIP_AUDIT_FLAGS)
 
 all: check test llm-live
-
-gradio: ensure-venv
-	@if [ ! -f .env ] && [ -z "$$OPENAI_API_KEY" ]; then \
-		echo "OPENAI_API_KEY is not set and .env is missing. Add it to .env or export it before running 'make gradio'."; \
-		exit 1; \
-	fi
-	@set -a; \
-	[ -f .env ] && . ./.env; \
-	set +a; \
-	AGENT_MODE=$${AGENT_MODE:-baseline}; \
-	if [ -z "$$OPENAI_API_KEY" ]; then \
-		echo "OPENAI_API_KEY is required to launch Gradio."; \
-		exit 1; \
-	fi; \
-	echo "Launching Gradio with AGENT_MODE=$${AGENT_MODE}"; \
-	AGENT_MODE=$$AGENT_MODE OPENAI_API_KEY=$$OPENAI_API_KEY $(PYTHON) gradio_app.py

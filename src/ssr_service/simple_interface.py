@@ -38,6 +38,7 @@ def build_simple_request(
     total_samples: Optional[int] = None,
     stratified: bool = True,
     intent_question: Optional[str] = None,
+    providers: Optional[List[str]] = None,
 ) -> SimulationRequest:
     """Create a `SimulationRequest` with sensible defaults for quick runs."""
     if not concept_text and not concept_url:
@@ -58,6 +59,7 @@ def build_simple_request(
         n=max(samples_per_persona, 1),
         total_n=total_samples,
         stratified=stratified,
+        providers=providers or ["openai"],
     )
 
     return SimulationRequest(
@@ -92,6 +94,7 @@ def run_simple_simulation(
     total_samples: Optional[int] = None,
     stratified: bool = True,
     intent_question: Optional[str] = None,
+    providers: Optional[List[str]] = None,
 ) -> SimulationResponse:
     """Run a simulation end-to-end using the simplified configuration."""
     request = build_simple_request(
@@ -111,6 +114,7 @@ def run_simple_simulation(
         total_samples=total_samples,
         stratified=stratified,
         intent_question=intent_question,
+        providers=providers,
     )
     return asyncio.run(run_simulation(request))
 

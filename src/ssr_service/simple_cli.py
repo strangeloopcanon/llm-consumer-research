@@ -97,6 +97,11 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Print the raw JSON response instead of a human summary.",
     )
+    parser.add_argument(
+        "--provider",
+        action="append",
+        help="LLM provider to use (e.g. openai, anthropic). Repeatable. Default: openai.",
+    )
     return parser
 
 
@@ -177,6 +182,7 @@ def main() -> None:
         total_samples=args.total_samples,
         stratified=not args.no_stratified,
         intent_question=args.intent_question,
+        providers=args.provider,
     )
 
     response_dict = response.model_dump()

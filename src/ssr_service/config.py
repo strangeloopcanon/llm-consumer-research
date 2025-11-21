@@ -21,6 +21,15 @@ class AppSettings(BaseSettings):
     openai_responses_model: str = Field(default="gpt-5", alias="RESEARCH_MODEL")
     openai_embedding_model: str = Field(default="text-embedding-3-small")
 
+    anthropic_api_key: Optional[str] = Field(default=None, alias="ANTHROPIC_API_KEY")
+    anthropic_model: str = Field(default="claude-3-haiku-20240307")
+
+    google_api_key: Optional[str] = Field(default=None, alias="GOOGLE_API_KEY")
+    gemini_model: str = Field(default="gemini-1.5-pro")
+
+    perplexity_api_key: Optional[str] = Field(default=None, alias="PERPLEXITY_API_KEY")
+    perplexity_model: str = Field(default="llama-3.1-sonar-large-128k-online")
+
     max_concurrency: int = Field(default=64, ge=1, le=512)
     default_sample_size: int = Field(default=200, ge=1)
 

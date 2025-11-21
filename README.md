@@ -58,11 +58,29 @@ pip install -e .
 uvicorn ssr_service.api:app --host 0.0.0.0 --port 8000
 ```
 
-To launch the Gradio dashboard with the right environment in place:
+
+
+### Modern Web UI (Recommended)
+
+We now provide a sleek, modern web interface built with React and Tailwind CSS:
 
 ```bash
-make gradio  # expects OPENAI_API_KEY in your shell or .env
+# Start the backend API
+uvicorn ssr_service.api:app --host 0.0.0.0 --port 8000
+
+# In another terminal, start the web UI
+cd web_ui
+npm install  # First time only
+npm run dev
 ```
+
+Then navigate to `http://localhost:5173` to use the interface. The web UI supports:
+- Multi-model provider selection (OpenAI, Anthropic, Gemini, Perplexity)
+- Real-time simulation results
+- Interactive charts and persona breakdowns
+- Responsive design for mobile and desktop
+
+See `web_ui/README.md` for more details.
 
 ### Example request
 
@@ -106,22 +124,71 @@ The response includes:
 - `src/ssr_service/personas.py` – persona library loader, CSV ingestion, and weight normalization for stratified samples.
 - `src/ssr_service/data/anchors/purchase_intent_en.yml` – versioned anchor banks; extend these to add new intents.
 - `src/ssr_service/data/personas/*.yml` – ACS-derived personas you can override or replace.
-- `src/ssr_service/frontend.py` & `gradio_app.py` – Gradio dashboard for researchers and demo loops.
+
 - `scripts/generate_gov_personas.py` – reproducible persona regeneration straight from the U.S. Census Bureau ACS API.
 - `tests/` & `tests_llm_live/` – unit tests plus golden-schema validation for live LLM runs.
 
 ### Configuration
 
-- `OPENAI_API_KEY` – required.
+- `OPENAI_API_KEY` – required for OpenAI models.
+- `ANTHROPIC_API_KEY` – required for Anthropic (Claude) models.
+- `GOOGLE_API_KEY` – required for Google (Gemini) models.
+- `PERPLEXITY_API_KEY` – required for Perplexity models.
 - `OPENAI_BASE_URL` – optional custom endpoint.
-- `RESEARCH_MODEL` – overrides the Responses API model (default `gpt-5`).
+- `RESEARCH_MODEL` – overrides the default OpenAI model (default `gpt-5`).
+- `ANTHROPIC_MODEL` – overrides the default Anthropic model (default `claude-3-5-sonnet-20241022`).
+- `GEMINI_MODEL` – overrides the default Gemini model (default `gemini-1.5-pro`).
+- `PERPLEXITY_MODEL` – overrides the default Perplexity model (default `llama-3.1-sonar-large-128k-online`).
 - `OPENAI_EMBEDDING_MODEL` – embedding model (default `text-embedding-3-small`).
 - `ANCHOR_BANK_PATH` – directory containing anchor YAML files.
 - `PERSONA_LIBRARY_PATH` – directory containing persona library YAML files.
 
 All settings are loaded via `pydantic-settings`; `.env` in the repo root is respected.
 
-### Personas and sampling
+### Multi-Model Support
+
+You can now query multiple LLM providers in a single simulation. Supported providers are:
+- `openai`
+- `anthropic`
+- `gemini`
+- `perplexity`
+
+To use them, ensure the corresponding API keys are set in your environment or `.env` file.
+
+**CLI Usage:**
+Use the `--provider` flag (repeatable) to specify which providers to use.
+
+```bash
+python -m ssr_service.simple_cli \
+  --concept-text "My product" \
+  --provider openai \
+  --provider anthropic \
+  --samples-per-persona 10
+```
+
+**API Usage:**
+Include the `providers` list in the `options` object:
+
+```json
+{
+  "options": {
+    "n": 50,
+    "providers": ["openai", "anthropic", "gemini"]
+  }
+}
+```
+
+### Advanced Simulation Features
+181: 
+182: The service now supports advanced controls for more nuanced simulations:
+183: 
+184: *   **Dynamic Population Generation:** Instead of static lists, generate personas on the fly using natural language descriptions (e.g., "Eco-conscious moms in Seattle").
+185: *   **Temperature Control:** Adjust the `temperature` (0.0 - 2.0) to control the creativity and variance of the LLM responses.
+186: *   **Context Injection:** Provide `additional_instructions` to give the LLM more context about the simulation scenario (e.g., "Assume a recession economy").
+187: 
+188: These features are available in both the Web UI (under "Population" and "Advanced" tabs) and the API/CLI.
+189: 
+190: ### Personas and sampling
 
 - Built-in persona groups live in `src/ssr_service/data/personas`. Each YAML notes the ACS table sources. Provide `persona_group` (e.g. `us_toothpaste_buyers`, `us_backpack_buyers`) to seed the request with those weighted personas.
 - Provide `persona_csv` to define custom segments. Columns can include demographics (`name`, `age`, `gender`, `region`, `income`, `occupation`, `education`, `household`), behavioural lists (`habits`, `motivations`, etc.), and `weight`. Unsupported columns are ignored.
@@ -287,18 +354,6 @@ The resulting weights are normalized and written into the YAMLs mentioned above,
 - Concurrency is configurable through `MAX_CONCURRENCY` (default 64). The orchestrator retries once on transient API errors.
 - Bootstrap CIs are computed over respondent-level means; increase `options.n` for more stable estimates.
 
-### Gradio frontend
-
-Launch the interactive UI:
-
-```bash
-source .venv311/bin/activate
-python gradio_app.py
-```
-
-The UI lets you:
-
-- Paste concept copy or a URL.
 - Choose a sample scenario (`Sample Scenario` dropdown) to auto-populate concept, personas, and question.
 - Choose a persona library group or upload a CSV of custom personas.
 - Select per-persona or stratified total sample sizes.
