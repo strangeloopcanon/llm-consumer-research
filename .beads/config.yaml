@@ -29,7 +29,7 @@ no-daemon: true
 # actor: ""
 
 # Path to database (overridden by BEADS_DB or --db)
-# db: ""
+db: ".beads/beads_v2.db"
 
 # Auto-start daemon if not running (can also use BEADS_AUTO_START_DAEMON)
 # auto-start-daemon: true
