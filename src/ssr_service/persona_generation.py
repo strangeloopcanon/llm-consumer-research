@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
-from typing import Dict, Iterable, List
+from typing import Iterable, List, Mapping
 
 from openai import AsyncOpenAI
 
@@ -39,7 +39,7 @@ def _split_values(value: object) -> List[str]:
     return [item.strip() for item in re.split(r"[;,]", text) if item.strip()]
 
 
-def _apply_attributes(persona: PersonaSpec, attributes: Dict[str, object]) -> None:
+def _apply_attributes(persona: PersonaSpec, attributes: Mapping[str, object]) -> None:
     for field, raw_value in attributes.items():
         if not hasattr(persona, field):
             continue

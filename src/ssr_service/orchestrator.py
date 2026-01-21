@@ -8,21 +8,27 @@ from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
-from .config import get_settings
+from .config import AppSettings, get_settings
 from .llm.base import LLMProvider, LLMResponse
 from .llm.factory import get_provider
 from .models import (
     ConceptInput,
     LikertDistribution,
+    PanelAllocation,
+    PanelPreviewResponse,
     PersonaQuestionResult,
     PersonaResult,
     PersonaSpec,
     QuestionAggregate,
+    QuestionSpec,
+    RespondentAnswer,
+    RespondentResult,
     SimulationOptions,
     SimulationRequest,
     SimulationResponse,
     coerce_http_url,
 )
+from .panel_context import apply_panel_context
 from .persona_generation import synthesize_personas
 from .personas import (
     combine_persona_buckets,
@@ -35,11 +41,24 @@ from .retrieval import ConceptArtifact, ingest_concept
 from .sample_data import load_sample
 from .ssr import SemanticSimilarityRater, likert_metrics, load_rater
 
+DEFAULT_ANCHOR_BANK_BY_INTENT: Dict[str, str] = {
+    "purchase_intent": "purchase_intent_en.yml",
+    "relevance": "purchase_intent_en.yml",
+    "trust": "trust_en.yml",
+    "clarity": "clarity_en.yml",
+    "value_for_money": "value_for_money_en.yml",
+    "differentiation": "differentiation_en.yml",
+}
+
 
 def _default_question(intent: str) -> str:
     lookup = {
         "purchase_intent": "How likely would you be to purchase this product?",
         "relevance": "How relevant is this concept to your needs?",
+        "trust": "How much do you trust this product or brand to deliver what it promises?",
+        "clarity": "How clear is what this product is and what it does?",
+        "value_for_money": "How good is the value for the money based on what you see here?",
+        "differentiation": "How different does this feel compared to alternatives you know?",
     }
     return lookup.get(intent, "How do you feel about this offering?")
 
@@ -131,11 +150,12 @@ async def generate_batch(
     prompt_block: str,
     question: str,
     n: int,
+    seed_offset: int = 0,
     concurrency: int = 32,
     temperature: Optional[float] = None,
 ) -> List[LLMResponse]:
     semaphore = asyncio.Semaphore(concurrency)
-    results: List[LLMResponse] = []
+    results: List[Optional[LLMResponse]] = [None] * n
 
     async def run_single(idx: int) -> None:
         async with semaphore:
@@ -144,10 +164,10 @@ async def generate_batch(
                     persona=persona,
                     prompt_block=prompt_block,
                     question=question,
-                    seed=idx,
+                    seed=seed_offset + idx,
                     temperature=temperature,
                 )
-                results.append(res)
+                results[idx] = res
             except Exception as err:  # noqa: BLE001
                 # One retry in case of transient API issues
                 try:
@@ -155,10 +175,10 @@ async def generate_batch(
                         persona=persona,
                         prompt_block=prompt_block,
                         question=question,
-                        seed=idx,
+                        seed=seed_offset + idx,
                         temperature=temperature,
                     )
-                    results.append(res)
+                    results[idx] = res
                 except Exception as inner_err:  # noqa: BLE001
                     raise RuntimeError(
                         "Failed to elicit rationale for persona "
@@ -166,7 +186,10 @@ async def generate_batch(
                     ) from err
 
     await asyncio.gather(*(run_single(i) for i in range(n)))
-    return results
+    ordered = [res for res in results if res is not None]
+    if len(ordered) != n:  # pragma: no cover - defensive guard
+        raise RuntimeError("Rationale batch did not return all responses")
+    return ordered
 
 
 async def _simulate_persona(
@@ -174,11 +197,14 @@ async def _simulate_persona(
     artifact: ConceptArtifact,
     question: str,
     question_id: str,
+    intent: str,
+    anchor_bank: str,
     rater: SemanticSimilarityRater,
     providers: List[LLMProvider],
     draws: int,
+    seed_base: int,
     options: SimulationOptions,
-) -> Tuple[PersonaQuestionResult, np.ndarray]:
+) -> Tuple[PersonaQuestionResult, np.ndarray, List[LLMResponse]]:
     settings = get_settings()
     
     # Distribute draws across providers
@@ -200,6 +226,7 @@ async def _simulate_persona(
         prompt_block += f"\n\nAdditional Instructions:\n{options.additional_instructions}"
 
     tasks = []
+    seed_offset = seed_base
     for i, provider in enumerate(providers):
         count = draws_per_provider + (1 if i < remainder else 0)
         if count > 0:
@@ -210,10 +237,12 @@ async def _simulate_persona(
                     prompt_block=prompt_block,
                     question=question,
                     n=count,
+                    seed_offset=seed_offset,
                     concurrency=min(settings.max_concurrency, 64),
                     temperature=options.temperature,
                 )
             )
+            seed_offset += count
     
     provider_results_list = await asyncio.gather(*tasks)
     for res_list in provider_results_list:
@@ -229,11 +258,14 @@ async def _simulate_persona(
         PersonaQuestionResult(
             question_id=question_id,
             question=question,
+            intent=intent,
+            anchor_bank=anchor_bank,
             distribution=distribution,
             rationales=cleaned,
             themes=themes,
         ),
         pmfs,
+        all_results,
     )
 
 
@@ -283,49 +315,69 @@ def _allocate_draws(
     return base.tolist()
 
 
-async def run_simulation(request: SimulationRequest) -> SimulationResponse:
-    settings = get_settings()
+def _default_anchor_bank(intent: str, fallback: str) -> str:
+    return DEFAULT_ANCHOR_BANK_BY_INTENT.get(intent, fallback)
 
-    concept_input = request.concept
-    persona_group = request.persona_group
-    intent_question_override = request.intent_question
-    options = request.options
 
-    if request.sample_id:
-        sample = load_sample(request.sample_id)
-        combined_url = coerce_http_url(concept_input.url) or coerce_http_url(
-            sample.source
-        )
-        concept_input = ConceptInput(
-            title=concept_input.title or sample.title,
-            text=concept_input.text or sample.description,
-            price=concept_input.price or sample.price,
-            url=combined_url,
-        )
-        persona_group = persona_group or sample.persona_group
-        if not intent_question_override and sample.intent_question:
-            intent_question_override = sample.intent_question
-            
-    # Initialize providers
-    provider_names = options.providers or ["openai"]
-    providers = [get_provider(name, model_override=options.model) for name in provider_names]
-
-    artifact = await ingest_concept(concept_input)
-    anchor_file = request.options.anchor_bank or "purchase_intent_en.yml"
-    rater = load_rater(anchor_file)
-
-    intent = request.intent or options.intent
-    question = (
-        intent_question_override
+def _build_question_specs(
+    request: SimulationRequest, options: SimulationOptions
+) -> List[QuestionSpec]:
+    base_intent = request.intent or options.intent
+    base_question = (
+        request.intent_question
         or options.intent_question
-        or _default_question(intent)
+        or _default_question(base_intent)
     )
+    base_anchor = options.anchor_bank or DEFAULT_ANCHOR_BANK_BY_INTENT["purchase_intent"]
 
+    specs: List[QuestionSpec] = []
+    for spec in request.questionnaire:
+        text = spec.text.strip()
+        if not text:
+            continue
+        specs.append(spec.model_copy(deep=True, update={"text": text}))
+
+    if not specs:
+        specs.append(
+            QuestionSpec(
+                id="q1",
+                text=base_question.strip(),
+                intent=base_intent,
+                anchor_bank=_default_anchor_bank(base_intent, base_anchor),
+            )
+        )
+
+    default_intent = specs[0].intent or base_intent
+    default_anchor = specs[0].anchor_bank or _default_anchor_bank(default_intent, base_anchor)
+
+    raw_questions = [q.strip() for q in request.questions if q and q.strip()]
+    for q in raw_questions:
+        specs.append(QuestionSpec(text=q, intent=default_intent, anchor_bank=default_anchor))
+
+    for idx, spec in enumerate(specs, start=1):
+        if not spec.id:
+            spec.id = f"q{idx}"
+        if not spec.intent:
+            spec.intent = default_intent
+        if not spec.anchor_bank:
+            spec.anchor_bank = _default_anchor_bank(spec.intent, default_anchor)
+
+    return specs
+
+
+async def _assemble_panel(
+    *,
+    request: SimulationRequest,
+    persona_group: Optional[str],
+    settings: AppSettings,
+    options: SimulationOptions,
+) -> tuple[List[PersonaSpec], List[int], Optional[str], Dict[str, str], bool]:
     library = get_persona_library(settings.persona_library_path)
     persona_group_source = None
     persona_buckets: List[Tuple[List[PersonaSpec], Optional[float]]] = []
     population_spec = request.population_spec
     population_spec_summary: Dict[str, str] = {}
+    panel_context_chunks = 0
 
     if request.personas:
         persona_buckets.append(
@@ -362,7 +414,9 @@ async def run_simulation(request: SimulationRequest) -> SimulationResponse:
         persona_buckets.append((generated, generation.weight_share))
 
     if population_spec:
-        spec_buckets = await buckets_from_population_spec(population_spec, library, settings)
+        spec_buckets = await buckets_from_population_spec(
+            population_spec, library, settings
+        )
         if spec_buckets:
             persona_buckets.extend(spec_buckets)
         population_spec_summary = {
@@ -388,97 +442,20 @@ async def run_simulation(request: SimulationRequest) -> SimulationResponse:
         personas = rake_personas(personas, population_spec.marginals, population_spec.raking)
         raking_applied = bool(population_spec.marginals)
 
+    if request.panel_context:
+        panel_context_chunks = apply_panel_context(personas, request.panel_context, seed=options.seed)
+
     draw_counts = _allocate_draws(personas, options)
-    raw_questions = [q.strip() for q in request.questions if q.strip()]
-    question_texts = [question] + raw_questions if raw_questions else [question]
-    question_ids = [f"q{i + 1}" for i in range(len(question_texts))]
-
-    ratings = rater.ratings()
-    weight_vector = np.array([p.weight for p in personas], dtype=float)
-    if weight_vector.sum() == 0:
-        weight_vector = np.ones(len(personas)) / len(personas)
-    else:
-        weight_vector = weight_vector / weight_vector.sum()
-
-    persona_question_results: List[List[PersonaQuestionResult]] = [
-        [] for _ in personas
-    ]
-    question_aggregates: List[QuestionAggregate] = []
-    question_ci_bounds: List[Tuple[float, float]] = []
-
-    rating_vector = np.array(ratings)
-
-    for qid, qtext in zip(question_ids, question_texts):
-        persona_tasks = [
-            _simulate_persona(persona, artifact, qtext, qid, rater, providers, draws, options)
-            for persona, draws in zip(personas, draw_counts)
-        ]
-
-        gathered = await asyncio.gather(*persona_tasks)
-        persona_pmfs: List[np.ndarray] = []
-
-        for idx, (result, pmfs) in enumerate(gathered):
-            persona_question_results[idx].append(result)
-            persona_pmfs.append(pmfs)
-
-        aggregate_pmf = np.zeros(len(ratings), dtype=float)
-        aggregate_samples = 0
-        all_means = []
-        for weight, pmfs, draws in zip(
-            weight_vector, persona_pmfs, draw_counts
-        ):
-            aggregate_pmf += weight * pmfs.mean(axis=0)
-            aggregate_samples += draws
-            means = pmfs @ rating_vector
-            all_means.append(means)
-
-        aggregate_dist = _make_distribution(aggregate_pmf, ratings, aggregate_samples)
-        question_aggregates.append(
-            QuestionAggregate(question_id=qid, question=qtext, aggregate=aggregate_dist)
-        )
-
-        mean_vals = np.concatenate(all_means) if all_means else np.array([])
-        ci_lower, ci_upper = _bootstrap_ci(mean_vals)
-        question_ci_bounds.append((ci_lower, ci_upper))
-
-    persona_results: List[PersonaResult] = []
-    for persona, question_results in zip(personas, persona_question_results):
-        first_result = question_results[0]
-        persona_results.append(
-            PersonaResult(
-                persona=persona,
-                distribution=first_result.distribution,
-                rationales=first_result.rationales,
-                themes=first_result.themes,
-                question_results=question_results,
-            )
-        )
-
-    first_question_dist = question_aggregates[0].aggregate
-    ci_lower, ci_upper = question_ci_bounds[0]
 
     metadata: Dict[str, str] = {
-        "question": question_texts[0],
-        "anchor_bank": anchor_file,
-        "intent": intent,
-        "description_length": str(len(artifact.description)),
-        "draw_allocation": ",".join(str(d) for d in draw_counts),
-        "ci_mean_lower": f"{ci_lower:.3f}",
-        "ci_mean_upper": f"{ci_upper:.3f}",
-        "persona_summary": _summarize_personas(persona_results),
         "persona_total": str(len(personas)),
-        "question_count": str(len(question_texts)),
-        "providers": ",".join(p.provider_name for p in providers),
+        "total_samples": str(sum(draw_counts)),
+        "draw_allocation": ",".join(str(d) for d in draw_counts),
     }
-
-    for idx, qtext in enumerate(question_texts, start=1):
-        metadata[f"question_{idx}"] = qtext
-        lower, upper = question_ci_bounds[idx - 1]
-        metadata[f"ci_mean_lower_q{idx}"] = f"{lower:.3f}"
-        metadata[f"ci_mean_upper_q{idx}"] = f"{upper:.3f}"
-
-    if request.sample_id:
-        metadata["sample_id"] = request.sample_id
+    if request.panel_context and panel_context_chunks > 0:
+        metadata["panel_context_chunks"] = str(panel_context_chunks)
+        metadata["panel_context_mode"] = request.panel_context.mode
+        metadata["panel_context_per_persona"] = str(request.panel_context.chunks_per_persona)
     if persona_group:
         metadata["persona_group"] = persona_group
     if persona_group_source:
@@ -502,6 +479,222 @@ async def run_simulation(request: SimulationRequest) -> SimulationResponse:
             elif raking_applied:
                 metadata["population_spec_raking"] += f" ({population_spec.raking.iterations} iters)"
 
+    return personas, draw_counts, persona_group_source, metadata, raking_applied
+
+
+async def preview_panel(request: SimulationRequest) -> PanelPreviewResponse:
+    settings = get_settings()
+    persona_group = request.persona_group
+
+    if request.sample_id:
+        sample = load_sample(request.sample_id)
+        persona_group = persona_group or sample.persona_group
+        if not request.intent_question and sample.intent_question:
+            request = request.model_copy(update={"intent_question": sample.intent_question})
+
+    question_specs = _build_question_specs(request, request.options)
+    personas, draw_counts, _, metadata, _ = await _assemble_panel(
+        request=request,
+        persona_group=persona_group,
+        settings=settings,
+        options=request.options,
+    )
+
+    panel = [
+        PanelAllocation(persona=persona, draws=draws)
+        for persona, draws in zip(personas, draw_counts)
+    ]
+
+    return PanelPreviewResponse(panel=panel, questions=question_specs, metadata=metadata)
+
+
+async def run_simulation(request: SimulationRequest) -> SimulationResponse:
+    settings = get_settings()
+
+    concept_input = request.concept
+    persona_group = request.persona_group
+    options = request.options
+
+    if request.sample_id:
+        sample = load_sample(request.sample_id)
+        combined_url = coerce_http_url(concept_input.url) or coerce_http_url(
+            sample.source
+        )
+        concept_input = ConceptInput(
+            title=concept_input.title or sample.title,
+            text=concept_input.text or sample.description,
+            price=concept_input.price or sample.price,
+            url=combined_url,
+        )
+        persona_group = persona_group or sample.persona_group
+        if not request.intent_question and sample.intent_question:
+            request = request.model_copy(update={"intent_question": sample.intent_question})
+            
+    # Initialize providers
+    provider_names = options.providers or ["openai"]
+    providers = [get_provider(name, model_override=options.model) for name in provider_names]
+
+    artifact = await ingest_concept(concept_input)
+    question_specs = _build_question_specs(request, options)
+    personas, draw_counts, persona_group_source, panel_metadata, raking_applied = await _assemble_panel(
+        request=request,
+        persona_group=persona_group,
+        settings=settings,
+        options=options,
+    )
+    weight_vector = np.array([p.weight for p in personas], dtype=float)
+    if weight_vector.sum() == 0:
+        weight_vector = np.ones(len(personas)) / len(personas)
+    else:
+        weight_vector = weight_vector / weight_vector.sum()
+
+    persona_question_results: List[List[PersonaQuestionResult]] = [
+        [] for _ in personas
+    ]
+    question_aggregates: List[QuestionAggregate] = []
+    question_ci_bounds: List[Tuple[float, float]] = []
+
+    respondent_tables: List[List[RespondentResult]] = []
+    if options.include_respondents:
+        for persona_idx, draws in enumerate(draw_counts):
+            respondent_tables.append(
+                [
+                    RespondentResult(
+                        respondent_id=f"p{persona_idx + 1}_r{idx + 1}",
+                    )
+                    for idx in range(draws)
+                ]
+            )
+
+    rater_cache: Dict[str, SemanticSimilarityRater] = {}
+
+    for spec in question_specs:
+        qid = spec.id or "q1"
+        qtext = spec.text
+        intent = spec.intent or options.intent
+        anchor_bank = spec.anchor_bank or (options.anchor_bank or DEFAULT_ANCHOR_BANK_BY_INTENT["purchase_intent"])
+        rater = rater_cache.get(anchor_bank)
+        if rater is None:
+            rater = load_rater(anchor_bank)
+            rater_cache[anchor_bank] = rater
+        ratings = rater.ratings()
+        rating_vector = np.array(ratings)
+
+        persona_tasks = [
+            _simulate_persona(
+                persona,
+                artifact,
+                qtext,
+                qid,
+                intent,
+                anchor_bank,
+                rater,
+                providers,
+                draws,
+                options.seed + persona_idx * 1_000_000,
+                options,
+            )
+            for persona_idx, (persona, draws) in enumerate(zip(personas, draw_counts))
+        ]
+
+        gathered = await asyncio.gather(*persona_tasks)
+        persona_pmfs: List[np.ndarray] = []
+
+        for idx, (result, pmfs, responses) in enumerate(gathered):
+            persona_question_results[idx].append(result)
+            persona_pmfs.append(pmfs)
+            if options.include_respondents:
+                for resp_idx, response in enumerate(responses):
+                    if idx >= len(respondent_tables) or resp_idx >= len(
+                        respondent_tables[idx]
+                    ):
+                        continue
+                    respondent_tables[idx][resp_idx].answers.append(
+                        RespondentAnswer(
+                            question_id=qid,
+                            intent=intent,
+                            anchor_bank=anchor_bank,
+                            provider=response.provider,
+                            model=response.model,
+                            rationale=result.rationales[resp_idx],
+                            score_mean=float(pmfs[resp_idx] @ rating_vector),
+                        )
+                    )
+
+        aggregate_pmf = np.zeros(len(ratings), dtype=float)
+        aggregate_samples = 0
+        all_means = []
+        for weight, pmfs, draws in zip(
+            weight_vector, persona_pmfs, draw_counts
+        ):
+            aggregate_pmf += weight * pmfs.mean(axis=0)
+            aggregate_samples += draws
+            means = pmfs @ rating_vector
+            all_means.append(means)
+
+        aggregate_dist = _make_distribution(aggregate_pmf, ratings, aggregate_samples)
+        question_aggregates.append(
+            QuestionAggregate(
+                question_id=qid,
+                question=qtext,
+                intent=intent,
+                anchor_bank=anchor_bank,
+                aggregate=aggregate_dist,
+            )
+        )
+
+        mean_vals = np.concatenate(all_means) if all_means else np.array([])
+        ci_lower, ci_upper = _bootstrap_ci(mean_vals)
+        question_ci_bounds.append((ci_lower, ci_upper))
+
+    persona_results: List[PersonaResult] = []
+    for idx, (persona, question_results) in enumerate(
+        zip(personas, persona_question_results)
+    ):
+        first_result = question_results[0]
+        persona_results.append(
+            PersonaResult(
+                persona=persona,
+                distribution=first_result.distribution,
+                rationales=first_result.rationales,
+                themes=first_result.themes,
+                question_results=question_results,
+                respondents=respondent_tables[idx] if options.include_respondents else [],
+            )
+        )
+
+    first_question_dist = question_aggregates[0].aggregate
+    ci_lower, ci_upper = question_ci_bounds[0]
+
+    first_spec = question_specs[0]
+    metadata: Dict[str, str] = {
+        "question": first_spec.text,
+        "anchor_bank": first_spec.anchor_bank or "",
+        "intent": first_spec.intent or "",
+        "description_length": str(len(artifact.description)),
+        "draw_allocation": ",".join(str(d) for d in draw_counts),
+        "ci_mean_lower": f"{ci_lower:.3f}",
+        "ci_mean_upper": f"{ci_upper:.3f}",
+        "persona_summary": _summarize_personas(persona_results),
+        "persona_total": str(len(personas)),
+        "question_count": str(len(question_specs)),
+        "providers": ",".join(p.provider_name for p in providers),
+    }
+    metadata.update(panel_metadata)
+
+    for idx, spec in enumerate(question_specs, start=1):
+        metadata[f"question_{idx}"] = spec.text
+        metadata[f"intent_q{idx}"] = spec.intent or ""
+        metadata[f"anchor_bank_q{idx}"] = spec.anchor_bank or ""
+        lower, upper = question_ci_bounds[idx - 1]
+        metadata[f"ci_mean_lower_q{idx}"] = f"{lower:.3f}"
+        metadata[f"ci_mean_upper_q{idx}"] = f"{upper:.3f}"
+
+    if request.sample_id:
+        metadata["sample_id"] = request.sample_id
+    if raking_applied and request.population_spec:
+        metadata.setdefault("population_spec_raking", request.population_spec.raking.mode)
+
     return SimulationResponse(
         aggregate=first_question_dist,
         personas=persona_results,
@@ -510,4 +703,4 @@ async def run_simulation(request: SimulationRequest) -> SimulationResponse:
     )
 
 
-__all__ = ["run_simulation"]
+__all__ = ["preview_panel", "run_simulation"]

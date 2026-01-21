@@ -60,32 +60,33 @@ def load_persona_group(path: Path) -> PersonaGroup:
 
     personas: List[PersonaSpec] = []
     for entry in personas_data:
-        persona_data = {
-            "name": _coerce_str(entry.get("name")) or "Persona",
-            "age": _coerce_str(entry.get("age")),
-            "gender": _coerce_str(entry.get("gender")),
-            "income": _coerce_str(entry.get("income")),
-            "region": _coerce_str(entry.get("region")),
-            "occupation": _coerce_str(entry.get("occupation")),
-            "education": _coerce_str(entry.get("education")),
-            "household": _coerce_str(entry.get("household")),
-            "purchase_frequency": _coerce_str(
-                entry.get("purchase_frequency") or entry.get("purchase_freq")
-            ),
-            "usage_context": _coerce_str(
-                entry.get("usage") or entry.get("usage_context")
-            ),
-            "background": _coerce_str(entry.get("background")),
-            "habits": _list_field(entry, "habits"),
-            "motivations": _list_field(entry, "motivations"),
-            "pain_points": _list_field(entry, "pain_points"),
-            "preferred_channels": _list_field(entry, "preferred_channels"),
-            "notes": _coerce_str(entry.get("notes")),
-            "source": _coerce_str(entry.get("persona_source") or entry.get("source")),
-            "descriptors": _list_field(entry, "descriptors"),
-            "weight": _coerce_float(entry.get("weight", 1.0)) or 1.0,
-        }
-        personas.append(PersonaSpec.model_validate(persona_data))
+            persona_data = {
+                "name": _coerce_str(entry.get("name")) or "Persona",
+                "age": _coerce_str(entry.get("age")),
+                "gender": _coerce_str(entry.get("gender")),
+                "income": _coerce_str(entry.get("income")),
+                "region": _coerce_str(entry.get("region")),
+                "occupation": _coerce_str(entry.get("occupation")),
+                "education": _coerce_str(entry.get("education")),
+                "household": _coerce_str(entry.get("household")),
+                "purchase_frequency": _coerce_str(
+                    entry.get("purchase_frequency") or entry.get("purchase_freq")
+                ),
+                "usage_context": _coerce_str(
+                    entry.get("usage") or entry.get("usage_context")
+                ),
+                "background": _coerce_str(entry.get("background")),
+                "habits": _list_field(entry, "habits"),
+                "motivations": _list_field(entry, "motivations"),
+                "pain_points": _list_field(entry, "pain_points"),
+                "preferred_channels": _list_field(entry, "preferred_channels"),
+                "notes": _coerce_str(entry.get("notes")),
+                "source": _coerce_str(entry.get("persona_source") or entry.get("source")),
+                "descriptors": _list_field(entry, "descriptors"),
+                "context": _list_field(entry, "context"),
+                "weight": _coerce_float(entry.get("weight", 1.0)) or 1.0,
+            }
+            personas.append(PersonaSpec.model_validate(persona_data))
 
     if not personas:
         raise ValueError(f"Persona file {path} contains no personas")
@@ -194,6 +195,7 @@ def _persona_search_blob(persona: PersonaSpec) -> str:
         persona.notes or "",
         persona.describe(),
         " ".join(persona.descriptors),
+        " ".join(persona.context),
         " ".join(persona.habits),
         " ".join(persona.motivations),
         " ".join(persona.pain_points),
@@ -285,6 +287,7 @@ def personas_from_csv(
                 "notes": row.get("notes") or None,
                 "source": row.get("persona_source") or row.get("source") or None,
                 "descriptors": _split_list(row.get("descriptors") or row.get("traits")),
+                "context": _split_list(row.get("context")),
                 "weight": _coerce_float(row.get("weight")) or 1.0,
             }
             personas.append(PersonaSpec.model_validate(persona_data))

@@ -14,6 +14,7 @@ from .models import (
     PersonaInjection,
     PersonaSpec,
     PopulationSpec,
+    QuestionSpec,
 )
 
 
@@ -136,7 +137,14 @@ def parse_injection_payload(expr: str) -> PersonaInjection:
                     data["weight_share"] = weight_share
                     continue
                 persona_payload = data.setdefault("persona", {})
-                if key in {"habits", "motivations", "pain_points", "preferred_channels", "descriptors"}:
+                if key in {
+                    "context",
+                    "habits",
+                    "motivations",
+                    "pain_points",
+                    "preferred_channels",
+                    "descriptors",
+                }:
                     persona_payload[key] = _split_csv(raw_value)
                 elif key == "weight":
                     persona_payload[key] = float(raw_value)
@@ -174,9 +182,46 @@ def parse_population_spec_input(expr: str) -> PopulationSpec:
     return PopulationSpec.model_validate(data)
 
 
+def parse_question_spec_expression(expr: str) -> QuestionSpec:
+    if not expr:
+        raise ValueError("question-spec expression cannot be empty")
+
+    question_id: str | None = None
+    text: str | None = None
+    intent: str | None = None
+    anchor_bank: str | None = None
+
+    for token in (part.strip() for part in expr.split(";") if part.strip()):
+        if "=" not in token:
+            continue
+        key, raw_value = token.split("=", 1)
+        key = key.strip()
+        raw_value = raw_value.strip()
+
+        if key in {"id", "qid", "question_id"}:
+            question_id = raw_value or None
+        elif key in {"text", "question"}:
+            text = raw_value
+        elif key == "intent":
+            intent = raw_value or None
+        elif key in {"anchor", "anchor_bank"}:
+            anchor_bank = raw_value or None
+
+    if not text:
+        raise ValueError("question-spec expression requires text=<question>")
+
+    return QuestionSpec(
+        id=question_id,
+        text=text,
+        intent=intent,
+        anchor_bank=anchor_bank,
+    )
+
+
 __all__ = [
     "parse_filter_expression",
     "parse_generation_expression",
     "parse_injection_payload",
     "parse_population_spec_input",
+    "parse_question_spec_expression",
 ]

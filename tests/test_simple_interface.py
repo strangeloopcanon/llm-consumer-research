@@ -69,6 +69,8 @@ def test_run_simple_simulation_monkeypatched(monkeypatch):
         question_result = PersonaQuestionResult(
             question_id="q1",
             question="How likely would you be to purchase this product?",
+            intent="purchase_intent",
+            anchor_bank="purchase_intent_en.yml",
             distribution=aggregate,
             rationales=["Great fit"],
             themes=["value"],
@@ -88,6 +90,8 @@ def test_run_simple_simulation_monkeypatched(monkeypatch):
                 QuestionAggregate(
                     question_id="q1",
                     question="How likely would you be to purchase this product?",
+                    intent="purchase_intent",
+                    anchor_bank="purchase_intent_en.yml",
                     aggregate=aggregate,
                 )
             ],

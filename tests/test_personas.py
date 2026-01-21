@@ -27,15 +27,19 @@ def test_persona_spec_describe_includes_enriched_fields():
 def test_personas_from_csv_parses_enriched_columns(tmp_path):
     csv_path = tmp_path / "panel.csv"
     csv_path.write_text(
-        "name,age,habits,motivations,preferred_channels,weight\n"
-        "Segment A,25-34,\"night runs;podcasts\",\"brand trust\",\"Email;Mobile\",0.4\n"
-        "Segment B,35-44,\"family errands\",\"budget hunts\",\"Retail\",0.6\n",
+        "name,age,habits,motivations,preferred_channels,context,weight\n"
+        "Segment A,25-34,\"night runs;podcasts\",\"brand trust\",\"Email;Mobile\",\"browser: heavy comparison shopper; brand: Colgate\",0.4\n"
+        "Segment B,35-44,\"family errands\",\"budget hunts\",\"Retail\",\"\",0.6\n",
         encoding="utf-8",
     )
     personas = personas_from_csv(csv_path)
     assert personas[0].habits == ["night runs", "podcasts"]
     assert personas[0].motivations == ["brand trust"]
     assert personas[0].preferred_channels == ["Email", "Mobile"]
+    assert personas[0].context == [
+        "browser: heavy comparison shopper",
+        "brand: Colgate",
+    ]
     assert personas[1].habits == ["family errands"]
 
 

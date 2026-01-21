@@ -1,0 +1,28 @@
+version: 1
+intent: differentiation
+locale: en-US
+description: >-
+  Likert anchors for differentiation. Use to measure whether the concept feels
+  meaningfully distinct from alternatives a shopper already knows.
+anchor_sets:
+  - id: base_v1
+    anchors:
+      1: "This feels the same as what already exists."
+      2: "There are only minor differences from other options."
+      3: "It has some distinct elements, but nothing major."
+      4: "It feels noticeably different in a way that matters."
+      5: "It feels truly unique compared to anything I've seen."
+  - id: competitor_v1
+    anchors:
+      1: "I can't see any real advantage over competitors."
+      2: "The advantage seems small or unclear."
+      3: "There are a few advantages, but I'd compare options."
+      4: "It has clear advantages that would influence my choice."
+      5: "It stands out strongly and would be my first pick."
+  - id: shopper_v1
+    anchors:
+      1: "I wouldn't switch because it's basically the same."
+      2: "I'd likely stick with what I already use."
+      3: "I'd consider it if the price or details were better."
+      4: "I'd be interested because it offers something different."
+      5: "I'd be excited to try it because it's clearly new."

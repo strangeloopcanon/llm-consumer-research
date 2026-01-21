@@ -1,0 +1,28 @@
+version: 1
+intent: value_for_money
+locale: en-US
+description: >-
+  Likert anchors for value for money. Use to measure whether the concept feels
+  worth the price relative to perceived benefits.
+anchor_sets:
+  - id: base_v1
+    anchors:
+      1: "This doesn't feel worth the price."
+      2: "It feels overpriced for what I'd get."
+      3: "The price seems fair, but I'm not convinced of the value."
+      4: "It seems like good value for the price."
+      5: "It seems like an excellent deal for what it offers."
+  - id: shopper_v1
+    anchors:
+      1: "I wouldn't pay for this at that price."
+      2: "I'd only consider it if it were cheaper or discounted."
+      3: "I'd compare options and think about it."
+      4: "I'd be comfortable paying that price."
+      5: "I'd happily pay; it feels clearly worth it."
+  - id: tradeoff_v1
+    anchors:
+      1: "The benefits don't justify the cost."
+      2: "The benefits only partly justify the cost."
+      3: "The cost-benefit tradeoff is unclear to me."
+      4: "The benefits justify the cost for me."
+      5: "The benefits strongly justify the cost for me."

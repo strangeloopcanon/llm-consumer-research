@@ -8,10 +8,12 @@ from typing import List, Optional
 
 from .models import (
     ConceptInput,
+    PanelContextSpec,
     PersonaFilter,
     PersonaGenerationTask,
     PersonaInjection,
     PopulationSpec,
+    QuestionSpec,
     SimulationOptions,
     SimulationRequest,
     SimulationResponse,
@@ -34,11 +36,15 @@ def build_simple_request(
     persona_injections: Optional[List[PersonaInjection]] = None,
     population_spec: Optional[PopulationSpec] = None,
     questions: Optional[List[str]] = None,
+    questionnaire: Optional[List[QuestionSpec]] = None,
     samples_per_persona: int = 50,
     total_samples: Optional[int] = None,
     stratified: bool = True,
     intent_question: Optional[str] = None,
     providers: Optional[List[str]] = None,
+    include_respondents: bool = False,
+    seed: int = 0,
+    panel_context: PanelContextSpec | None = None,
 ) -> SimulationRequest:
     """Create a `SimulationRequest` with sensible defaults for quick runs."""
     if not concept_text and not concept_url:
@@ -60,12 +66,15 @@ def build_simple_request(
         total_n=total_samples,
         stratified=stratified,
         providers=providers or ["openai"],
+        include_respondents=include_respondents,
+        seed=seed,
     )
 
     return SimulationRequest(
         concept=concept,
         persona_group=persona_group,
         persona_csv=csv_data,
+        questionnaire=list(questionnaire or []),
         persona_filters=list(persona_filters or []),
         persona_generations=list(persona_generations or []),
         persona_injections=list(persona_injections or []),
@@ -73,6 +82,7 @@ def build_simple_request(
         questions=list(questions or []),
         intent_question=intent_question,
         options=options,
+        panel_context=panel_context,
     )
 
 
@@ -90,11 +100,15 @@ def run_simple_simulation(
     persona_injections: Optional[List[PersonaInjection]] = None,
     population_spec: Optional[PopulationSpec] = None,
     questions: Optional[List[str]] = None,
+    questionnaire: Optional[List[QuestionSpec]] = None,
     samples_per_persona: int = 50,
     total_samples: Optional[int] = None,
     stratified: bool = True,
     intent_question: Optional[str] = None,
     providers: Optional[List[str]] = None,
+    include_respondents: bool = False,
+    seed: int = 0,
+    panel_context: PanelContextSpec | None = None,
 ) -> SimulationResponse:
     """Run a simulation end-to-end using the simplified configuration."""
     request = build_simple_request(
@@ -110,11 +124,15 @@ def run_simple_simulation(
         persona_injections=persona_injections,
         population_spec=population_spec,
         questions=questions,
+        questionnaire=questionnaire,
         samples_per_persona=samples_per_persona,
         total_samples=total_samples,
         stratified=stratified,
         intent_question=intent_question,
         providers=providers,
+        include_respondents=include_respondents,
+        seed=seed,
+        panel_context=panel_context,
     )
     return asyncio.run(run_simulation(request))
 
