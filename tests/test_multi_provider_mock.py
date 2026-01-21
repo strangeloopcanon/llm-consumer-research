@@ -6,13 +6,13 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import numpy as np
 import pytest
 
+from ssr_service.config import get_settings
 from ssr_service.models import (
     ConceptInput,
     PersonaSpec,
     SimulationOptions,
     SimulationRequest,
 )
-from ssr_service.config import get_settings
 from ssr_service.orchestrator import run_simulation
 
 
