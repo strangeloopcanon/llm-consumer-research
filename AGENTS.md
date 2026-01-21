@@ -44,7 +44,7 @@ Drop‑In Rules for Autonomous Coding Agents
 |---|---|---|
 | Format | Black (Py); Prettier (JS/TS) | Same |
 | Lint | Ruff defaults (Py); ESLint v9 flat (JS/TS) | Expanded rules; exceptions documented |
-| Types | mypy (Py) / `tsc` (TS) not strict | `mypy --strict`; TS `strict`; no lingering ignores |
+| Types | ty (Py) / `tsc` (TS) not strict | `ty --strict`; TS `strict`; no lingering ignores |
 | Coverage | Global ≥80%; PRs don’t reduce coverage | Global ≥90%; changed lines ≥90%; mutation tests on critical modules (scheduled) |
 | LLM live tests | **Mandatory if any LLM logic exists**; golden scenarios in CI (staging keys) | Add faithfulness/relevance evals, OWASP LLM Top‑10 probes, and SLO gates |
 | SAST | Bandit (advisory); minimal Semgrep (advisory) | Bandit + Semgrep blocking on high severity |
@@ -66,7 +66,7 @@ Drop‑In Rules for Autonomous Coding Agents
 
 ## 4) Tooling (names only)
 - **Format/Lint:** Black, Ruff (Py). ESLint v9 + Prettier (JS/TS).  
-- **Types:** mypy (Py), `tsc` (TS).  
+- **Types:** ty (Py), `tsc` (TS).  
 - **Tests:** pytest + pytest‑cov. Property‑based tests where logic is stateful, numeric, or parser‑like.  
 - **Secrets:** detect‑secrets (pre‑commit).  
 - **Security:** Bandit, Semgrep.  
@@ -227,7 +227,7 @@ Switch to `AGENT_MODE=production` when any apply:
 
 ## Appendix F — Cold start (empty repo rules)
 - **Interface contract** (Appendix A) via a **Makefile** (preferred for Python). `justfile` is acceptable. For Node‑only repos, package.json scripts are acceptable.  
-- **Python:** `pyproject.toml` with Black, Ruff, mypy, pytest, coverage; `requirements*.txt`; `.gitignore`; pre‑commit + commitlint enabled.  
+- **Python:** `pyproject.toml` with Black, Ruff, ty, pytest, coverage; `requirements*.txt`; `.gitignore`; pre‑commit + commitlint enabled.  
 - **LLM projects:** `tests_llm_live/` with goldens and schema validation.  
 - **CI:** a single workflow that runs `setup` → `all` (and `release` on tags in Production).  
 
@@ -276,4 +276,3 @@ USE the bd tool instead of markdown for all new work. We only and always track w
 - Keep runnable demos in `scripts/`.
 
 > Prefer small models for smoke tests (e.g., `Qwen/Qwen3-0.6B`), and use staging keys for LLM live tests per Section 5.
-

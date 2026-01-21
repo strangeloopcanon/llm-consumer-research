@@ -1,0 +1,28 @@
+version: 1
+intent: trust
+locale: en-US
+description: >-
+  Likert anchors for trust. Use to measure whether a shopper feels confident the
+  product/brand will deliver on its claims.
+anchor_sets:
+  - id: base_v1
+    anchors:
+      1: "I don't trust this product or brand at all."
+      2: "I have doubts and would be cautious."
+      3: "I'm unsure; I would need proof or reassurance."
+      4: "I mostly trust it, though I'd still verify details."
+      5: "I trust it completely and feel confident in it."
+  - id: evidence_v1
+    anchors:
+      1: "The claims feel questionable or sketchy."
+      2: "Some claims feel exaggerated or hard to believe."
+      3: "It's plausible, but I'd want reviews or evidence."
+      4: "It seems credible based on what I see."
+      5: "It feels highly credible and well-supported."
+  - id: risk_v1
+    anchors:
+      1: "I would worry about being disappointed or misled."
+      2: "I would worry enough to avoid buying without reassurance."
+      3: "I see some risk, but I'd investigate before deciding."
+      4: "I see low risk; I’d feel comfortable trying it."
+      5: "I see almost no risk; I’d buy without hesitation."

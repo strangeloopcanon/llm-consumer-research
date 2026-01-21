@@ -17,6 +17,7 @@ venv/
 # Data / caches
 *.log
 *.tmp
+.codex/
 .beads/*.db
 plan.md
 2510.08338v1.pdf

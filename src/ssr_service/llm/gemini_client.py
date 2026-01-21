@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Optional
 
 import google.generativeai as genai
-from google.generativeai.types import HarmBlockThreshold, HarmCategory
+from google.generativeai.types import GenerationConfig, HarmBlockThreshold, HarmCategory
 
 from ..cache import add_to_cache, get_from_cache
 from ..config import get_settings
@@ -75,10 +75,10 @@ class GeminiProvider(LLMProvider):
         
         response = await self._model.generate_content_async(
             contents=prompt,
-            generation_config={
-                "response_mime_type": "application/json",
-                "temperature": temperature,
-            },
+            generation_config=GenerationConfig(
+                response_mime_type="application/json",
+                temperature=temperature,
+            ),
             safety_settings={
                 HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
                 HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,

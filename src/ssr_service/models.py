@@ -40,6 +40,7 @@ class PersonaSpec(BaseModel):
     notes: Optional[str] = None
     source: Optional[str] = None
     descriptors: List[str] = Field(default_factory=list)
+    context: List[str] = Field(default_factory=list)
     weight: float = Field(default=1.0, ge=0)
 
     def describe(self) -> str:
@@ -76,6 +77,7 @@ class PersonaSpec(BaseModel):
         _format_list("pain points", self.pain_points)
         _format_list("preferred channels", self.preferred_channels)
         _format_list("additional traits", self.descriptors)
+        _format_list("context", self.context)
 
         if self.notes:
             parts.append(self.notes)
@@ -256,6 +258,56 @@ class SimulationOptions(BaseModel):
     providers: List[str] = Field(default_factory=lambda: ["openai"])
     temperature: Optional[float] = Field(default=None, ge=0.0, le=2.0)
     additional_instructions: Optional[str] = None
+    seed: int = Field(
+        default=0,
+        ge=0,
+        description="Base seed used for panel reuse and deterministic sampling.",
+    )
+    include_respondents: bool = Field(
+        default=False,
+        description="Include respondent-level records for cross-question analysis.",
+    )
+
+
+class QuestionSpec(BaseModel):
+    """Describe a single question in a multi-question simulation."""
+
+    id: Optional[str] = Field(
+        default=None,
+        description="Optional stable identifier for the question (e.g., q1).",
+    )
+    text: str = Field(description="Question text presented to panelists.")
+    intent: Optional[str] = Field(
+        default=None,
+        description="Optional measurement intent (e.g., purchase_intent, trust, clarity).",
+    )
+    anchor_bank: Optional[str] = Field(
+        default=None,
+        description="Anchor YAML filename to use for SSR scoring (defaults by intent).",
+    )
+
+
+class PanelContextSpec(BaseModel):
+    """Optional behavioral context pool distributed across panelists."""
+
+    text: Optional[str] = Field(
+        default=None,
+        description="Raw notes (bullets/paragraphs). Will be split into chunks when `chunks` is empty.",
+    )
+    chunks: List[str] = Field(
+        default_factory=list,
+        description="Explicit context chunks to distribute across personas.",
+    )
+    mode: Literal["shared", "round_robin", "sample"] = Field(
+        default="shared",
+        description="How to allocate chunks across personas.",
+    )
+    chunks_per_persona: int = Field(
+        default=3,
+        ge=0,
+        le=50,
+        description="How many chunks to attach to each persona (0 disables allocation).",
+    )
 
 
 class SimulationRequest(BaseModel):
@@ -264,6 +316,13 @@ class SimulationRequest(BaseModel):
     persona_group: Optional[str] = Field(default=None)
     persona_csv: Optional[str] = Field(
         default=None, description="Raw CSV string defining personas"
+    )
+    questionnaire: List[QuestionSpec] = Field(
+        default_factory=list,
+        description=(
+            "Optional explicit question specs. When provided, these questions run first, "
+            "followed by any entries in `questions`."
+        ),
     )
     questions: List[str] = Field(
         default_factory=list,
@@ -291,6 +350,10 @@ class SimulationRequest(BaseModel):
         default=None,
         description="High-level population definition evaluated after other persona inputs.",
     )
+    panel_context: Optional[PanelContextSpec] = Field(
+        default=None,
+        description="Optional behavioral context distributed across personas after population assembly.",
+    )
 
 
 class LikertDistribution(BaseModel):
@@ -304,9 +367,26 @@ class LikertDistribution(BaseModel):
 class PersonaQuestionResult(BaseModel):
     question_id: str
     question: str
+    intent: str
+    anchor_bank: str
     distribution: LikertDistribution
     rationales: List[str]
     themes: List[str]
+
+
+class RespondentAnswer(BaseModel):
+    question_id: str
+    intent: str
+    anchor_bank: str
+    provider: str
+    model: str
+    rationale: str
+    score_mean: float
+
+
+class RespondentResult(BaseModel):
+    respondent_id: str
+    answers: List[RespondentAnswer] = Field(default_factory=list)
 
 
 class PersonaResult(BaseModel):
@@ -315,11 +395,14 @@ class PersonaResult(BaseModel):
     rationales: List[str]
     themes: List[str]
     question_results: List[PersonaQuestionResult] = Field(default_factory=list)
+    respondents: List[RespondentResult] = Field(default_factory=list)
 
 
 class QuestionAggregate(BaseModel):
     question_id: str
     question: str
+    intent: str
+    anchor_bank: str
     aggregate: LikertDistribution
 
 
@@ -330,9 +413,31 @@ class SimulationResponse(BaseModel):
     questions: List[QuestionAggregate] = Field(default_factory=list)
 
 
+class PanelAllocation(BaseModel):
+    persona: PersonaSpec
+    draws: int = Field(ge=0)
+
+
+class PanelPreviewResponse(BaseModel):
+    panel: List[PanelAllocation]
+    questions: List[QuestionSpec]
+    metadata: Dict[str, str] = Field(default_factory=dict)
+
+
+class PersonaGroupSummary(BaseModel):
+    name: str
+    description: str
+    persona_count: int
+    source: Optional[str] = None
+
+
 __all__ = [
     "ConceptInput",
     "LikertDistribution",
+    "PanelAllocation",
+    "PanelPreviewResponse",
+    "PersonaGroupSummary",
+    "QuestionSpec",
     "QuestionAggregate",
     "PersonaResult",
     "PersonaSpec",
@@ -341,7 +446,10 @@ __all__ = [
     "PersonaGenerationTask",
     "PersonaInjection",
     "PersonaQuestionResult",
+    "RespondentAnswer",
+    "RespondentResult",
     "PopulationSpec",
+    "PanelContextSpec",
     "RakingConfig",
     "SimulationOptions",
     "SimulationRequest",

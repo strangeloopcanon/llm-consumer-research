@@ -1,0 +1,28 @@
+version: 1
+intent: clarity
+locale: en-US
+description: >-
+  Likert anchors for clarity of the concept. Use to measure whether a shopper
+  quickly understands what the product is and what it does.
+anchor_sets:
+  - id: base_v1
+    anchors:
+      1: "I can't tell what this is or what it's for."
+      2: "I have a rough idea, but it's still confusing."
+      3: "I somewhat understand it, but I'd need more details."
+      4: "It's mostly clear to me what this is and how it works."
+      5: "It's immediately clear what this is and what I'd get."
+  - id: language_v1
+    anchors:
+      1: "The description feels vague and unclear."
+      2: "Some parts make sense, but key details are missing."
+      3: "The basics are understandable, but I'm left with questions."
+      4: "The explanation is clear enough to make a decision."
+      5: "The explanation is crystal clear and leaves no ambiguity."
+  - id: shopper_v1
+    anchors:
+      1: "I wouldn't know what I'm buying here."
+      2: "I'd hesitate because I'm not sure what this actually does."
+      3: "I'd keep reading to fully understand it."
+      4: "I understand it well enough to consider buying."
+      5: "I understand it instantly without needing extra context."

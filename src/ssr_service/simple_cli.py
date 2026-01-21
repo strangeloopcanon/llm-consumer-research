@@ -3,15 +3,28 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 from pathlib import Path
 from typing import Any
 
+import yaml
+
+from .models import (
+    ConceptInput,
+    PanelContextSpec,
+    QuestionSpec,
+    SimulationOptions,
+    SimulationRequest,
+    coerce_http_url,
+)
+from .orchestrator import preview_panel
 from .persona_inputs import (
     parse_filter_expression,
     parse_generation_expression,
     parse_injection_payload,
     parse_population_spec_input,
+    parse_question_spec_expression,
 )
 from .simple_interface import run_simple_simulation
 
@@ -64,6 +77,20 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Additional question to ask (repeat flag for multiple questions).",
     )
     parser.add_argument(
+        "--question-spec",
+        action="append",
+        help=(
+            "Question spec expression (e.g. 'text=How much do you trust this?;"
+            "intent=trust;anchor_bank=trust_en.yml'). Repeatable."
+        ),
+    )
+    parser.add_argument(
+        "--questionnaire",
+        type=Path,
+        default=None,
+        help="Path to a YAML/JSON file containing a list of question specs.",
+    )
+    parser.add_argument(
         "--population-spec",
         help=(
             "Population spec as file path or inline YAML/JSON defining base group,"
@@ -93,9 +120,42 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
     )
     parser.add_argument(
+        "--seed",
+        type=int,
+        default=0,
+        help="Base seed for panel reuse and deterministic sampling.",
+    )
+    parser.add_argument(
+        "--panel-context",
+        default=None,
+        help="Behavioral context notes (inline text or path to a file).",
+    )
+    parser.add_argument(
+        "--panel-context-mode",
+        default="shared",
+        choices=["shared", "round_robin", "sample"],
+        help="How to allocate panel context chunks across personas.",
+    )
+    parser.add_argument(
+        "--panel-context-per-persona",
+        type=int,
+        default=3,
+        help="How many context chunks to attach to each persona (0 disables).",
+    )
+    parser.add_argument(
+        "--include-respondents",
+        action="store_true",
+        help="Include respondent-level records in the JSON response.",
+    )
+    parser.add_argument(
         "--json",
         action="store_true",
         help="Print the raw JSON response instead of a human summary.",
+    )
+    parser.add_argument(
+        "--panel-preview",
+        action="store_true",
+        help="Preview the resolved panel + questions without calling LLMs.",
     )
     parser.add_argument(
         "--provider",
@@ -111,6 +171,13 @@ def _print_human_summary(response: Any) -> None:
     print(f"Mean: {aggregate['mean']:.2f}")
     print(f"Top-2 box: {aggregate['top2box']:.1%}")
     print(f"Sample size: {aggregate['sample_n']}")
+    if response.get("questions"):
+        print()
+        print("=== Questions ===")
+        for question in response["questions"]:
+            dist = question["aggregate"]
+            print(f"- {question['question_id']}: {question['question']}")
+            print(f"  Mean {dist['mean']:.2f} | Top-2 {dist['top2box']:.1%}")
     print()
     print("=== Personas ===")
     for persona_result in response["personas"]:
@@ -142,6 +209,33 @@ def _print_human_summary(response: Any) -> None:
         print(f"{key}: {value}")
 
 
+def _load_questionnaire(path: Path) -> list[QuestionSpec]:
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if data is None:
+        return []
+    if isinstance(data, dict):
+        data = data.get("questionnaire") or data.get("questions") or []
+    if not isinstance(data, list):
+        raise ValueError("questionnaire file must contain a list of question specs")
+    return [QuestionSpec.model_validate(item) for item in data]
+
+
+def _print_panel_preview(response: Any) -> None:
+    print("=== Panel Preview ===")
+    for item in response.get("panel", []):
+        persona = item["persona"]
+        draws = item["draws"]
+        print(f"- {persona['name']} (weight {persona['weight']:.0%}) -> draws {draws}")
+    print()
+    print("=== Questions ===")
+    for spec in response.get("questions", []):
+        print(f"- {spec.get('id')}: {spec['text']} [{spec.get('intent')}]")
+    print()
+    print("=== Metadata ===")
+    for key, value in response.get("metadata", {}).items():
+        print(f"{key}: {value}")
+
+
 def main() -> None:
     parser = _build_parser()
     args = parser.parse_args()
@@ -163,8 +257,70 @@ def main() -> None:
             else None
         )
         questions = [q.strip() for q in (args.question or []) if q and q.strip()]
+        questionnaire: list[QuestionSpec] = []
+        if args.questionnaire:
+            questionnaire.extend(_load_questionnaire(args.questionnaire))
+        if args.question_spec:
+            questionnaire.extend(
+                parse_question_spec_expression(expr)
+                for expr in (args.question_spec or [])
+            )
     except ValueError as exc:  # pragma: no cover - exercised via CLI usage
         parser.error(str(exc))
+
+    panel_context: PanelContextSpec | None = None
+    if args.panel_context:
+        candidate_path = Path(args.panel_context)
+        context_text = (
+            candidate_path.read_text(encoding="utf-8")
+            if candidate_path.exists()
+            else args.panel_context
+        )
+        panel_context = PanelContextSpec(
+            text=context_text,
+            mode=args.panel_context_mode,
+            chunks_per_persona=args.panel_context_per_persona,
+        )
+
+    if args.panel_preview:
+        csv_data = (
+            args.persona_csv.read_text(encoding="utf-8")
+            if args.persona_csv is not None
+            else None
+        )
+        request = SimulationRequest(
+            concept=ConceptInput(
+                title=args.title or None,
+                text=(args.concept_text or "").strip() or None,
+                price=args.price or None,
+                url=coerce_http_url(args.concept_url),
+            ),
+            persona_group=args.persona_group,
+            persona_csv=csv_data,
+            persona_filters=persona_filters,
+            persona_generations=persona_generations,
+            persona_injections=persona_injections,
+            population_spec=population_spec,
+            questions=questions,
+            questionnaire=questionnaire,
+            intent_question=args.intent_question,
+            options=SimulationOptions(
+                n=args.samples_per_persona,
+                total_n=args.total_samples,
+                stratified=not args.no_stratified,
+                providers=args.provider or ["openai"],
+                include_respondents=args.include_respondents,
+                seed=args.seed,
+            ),
+            panel_context=panel_context,
+        )
+        preview = asyncio.run(preview_panel(request))
+        response_dict = preview.model_dump()
+        if args.json:
+            print(json.dumps(response_dict, indent=2))
+        else:
+            _print_panel_preview(response_dict)
+        return
 
     response = run_simple_simulation(
         concept_text=args.concept_text or "",
@@ -178,11 +334,15 @@ def main() -> None:
         persona_injections=persona_injections,
         population_spec=population_spec,
         questions=questions,
+        questionnaire=questionnaire,
         samples_per_persona=args.samples_per_persona,
         total_samples=args.total_samples,
         stratified=not args.no_stratified,
         intent_question=args.intent_question,
         providers=args.provider,
+        include_respondents=args.include_respondents,
+        seed=args.seed,
+        panel_context=panel_context,
     )
 
     response_dict = response.model_dump()

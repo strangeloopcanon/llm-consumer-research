@@ -5,7 +5,7 @@ VENV ?= .venv311
 PYTHON := $(VENV)/bin/python
 PIP := $(PYTHON) -m pip
 RUFF := $(VENV)/bin/ruff
-MYPY := $(VENV)/bin/mypy
+TY := $(VENV)/bin/ty
 PYTEST := $(VENV)/bin/pytest
 BANDIT := $(VENV)/bin/bandit
 PIP_AUDIT := $(VENV)/bin/pip-audit
@@ -24,7 +24,7 @@ ensure-venv:
 
 check: ensure-venv
 	$(RUFF) check .
-	$(MYPY) src tests
+	$(TY) check src tests
 	$(BANDIT) -q -r src
 
 test: ensure-venv

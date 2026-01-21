@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import numpy as np
 import pytest
 
+from ssr_service.config import get_settings
 from ssr_service.models import (
     ConceptInput,
     PersonaSpec,
@@ -63,6 +64,7 @@ async def test_multi_provider_simulation(
         "GOOGLE_API_KEY": "dummy",
         "PERPLEXITY_API_KEY": "dummy"
     }):
+        get_settings.cache_clear()
         request = SimulationRequest(
             concept=ConceptInput(
                 title="Test Product",

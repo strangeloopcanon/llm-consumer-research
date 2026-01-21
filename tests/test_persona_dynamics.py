@@ -245,3 +245,69 @@ async def test_run_simulation_with_population_spec(monkeypatch):
     assert "population_spec" in response.metadata
     assert response.metadata.get("question_count") == "1"
     assert response.questions
+
+
+@pytest.mark.asyncio
+async def test_run_simulation_includes_respondents_and_reuses_panelists(monkeypatch):
+    class DummyProvider:
+        provider_name = "dummy"
+
+        async def generate_rationale(
+            self, persona, prompt_block, question, seed=None, temperature=None
+        ):
+            from ssr_service.llm.base import LLMResponse
+
+            return LLMResponse(
+                rationale=f"rationale {seed}",
+                provider="dummy",
+                model="dummy-model",
+            )
+
+    async def fake_ingest_concept(concept: ConceptInput):
+        class Artifact:
+            description = concept.text or ""
+
+            @staticmethod
+            def as_prompt_block() -> str:
+                return "concept block"
+
+        return Artifact()
+
+    def fake_load_rater(anchor_file: str):  # noqa: ARG001
+        class Rater:
+            @staticmethod
+            def ratings() -> list[int]:
+                return [1, 2, 3, 4, 5]
+
+            @staticmethod
+            def score_text(text: str) -> np.ndarray:  # noqa: ARG001
+                return np.array([0.1, 0.2, 0.3, 0.25, 0.15])
+
+        return Rater()
+
+    monkeypatch.setattr(
+        "ssr_service.orchestrator.get_provider",
+        lambda name, model_override=None: DummyProvider(),
+    )
+    monkeypatch.setattr("ssr_service.orchestrator.ingest_concept", fake_ingest_concept)
+    monkeypatch.setattr("ssr_service.orchestrator.load_rater", fake_load_rater)
+
+    request = SimulationRequest(
+        concept=ConceptInput(text="Panel reuse test"),
+        personas=[PersonaSpec(name="Test Persona", weight=1.0)],
+        questions=["Would you recommend this to a friend?"],
+        options=SimulationOptions(n=3, stratified=False, include_respondents=True),
+    )
+
+    response = await run_simulation(request)
+    assert len(response.questions) == 2
+    assert response.personas[0].respondents
+
+    respondent_ids = [r.respondent_id for r in response.personas[0].respondents]
+    assert respondent_ids == ["p1_r1", "p1_r2", "p1_r3"]
+    for idx, respondent in enumerate(response.personas[0].respondents):
+        assert len(respondent.answers) == 2
+        assert respondent.answers[0].question_id == "q1"
+        assert respondent.answers[1].question_id == "q2"
+        assert respondent.answers[0].rationale == f"rationale {idx}"
+        assert respondent.answers[1].rationale == f"rationale {idx}"
