@@ -12,12 +12,10 @@ import io
 import json
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import List, Optional, Tuple
 
 from .config import AppSettings, get_settings
-from .llm.factory import get_provider
 from .models import (
-    PersonaGenerationTask,
     PersonaInjection,
     PersonaSpec,
     PopulationSpec,
@@ -192,8 +190,6 @@ async def synthesize_panel(
     """
     if settings is None:
         settings = get_settings()
-
-    provider = get_provider("openai")
 
     user_prompt_parts = []
     if target_description:

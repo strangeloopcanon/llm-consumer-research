@@ -6,9 +6,10 @@ import logging
 from contextlib import asynccontextmanager
 from typing import Any, Dict, List, Optional
 
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
+from .audience_builder import parse_evidence, synthesize_panel
 from .config import AppSettings, get_settings
 from .db import delete_run, get_run, init_db, list_runs, save_run
 from .models import (
@@ -145,9 +146,7 @@ async def delete_run_by_id(run_id: str) -> Dict[str, str]:
 # Audience Builder Endpoints
 # ============================================================================
 
-from fastapi import File, Form, UploadFile
 
-from .audience_builder import parse_evidence, synthesize_panel
 
 
 @app.post("/audience/build")

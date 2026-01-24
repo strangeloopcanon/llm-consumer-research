@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from ssr_service.audience_builder import parse_evidence
 
 
