@@ -145,3 +145,62 @@ export const listPersonaGroups = async (): Promise<PersonaGroupSummary[]> => {
     const response = await axios.get<PersonaGroupSummary[]>(`${API_URL}/persona-groups`);
     return response.data;
 };
+
+// ============================================================================
+// Run History API
+// ============================================================================
+
+export interface RunSummary {
+    id: string;
+    created_at: string;
+    label: string | null;
+    status: string;
+}
+
+export interface RunDetail extends RunSummary {
+    request: SimulationRequest;
+    response: SimulationResponse;
+}
+
+export const listRuns = async (limit = 50, offset = 0): Promise<RunSummary[]> => {
+    const response = await axios.get<RunSummary[]>(`${API_URL}/runs`, {
+        params: { limit, offset },
+    });
+    return response.data;
+};
+
+export const getRunById = async (runId: string): Promise<RunDetail> => {
+    const response = await axios.get<RunDetail>(`${API_URL}/runs/${runId}`);
+    return response.data;
+};
+
+export const deleteRunById = async (runId: string): Promise<void> => {
+    await axios.delete(`${API_URL}/runs/${runId}`);
+};
+
+// ============================================================================
+// Audience Builder API
+// ============================================================================
+
+export interface AudienceBuildResponse {
+    population_spec: unknown;
+    reasoning: string;
+    evidence_summary_length: number;
+}
+
+export const buildAudience = async (
+    files: File[],
+    targetDescription?: string
+): Promise<AudienceBuildResponse> => {
+    const formData = new FormData();
+    files.forEach((file) => formData.append('files', file));
+    if (targetDescription) {
+        formData.append('target_description', targetDescription);
+    }
+    const response = await axios.post<AudienceBuildResponse>(
+        `${API_URL}/audience/build`,
+        formData,
+        { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
+    return response.data;
+};

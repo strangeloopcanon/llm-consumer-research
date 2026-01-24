@@ -46,41 +46,55 @@ For our technical users, here's a deeper dive into the implementation.
 
 The result is a transparent pipeline: every decision—persona weights, anchors, models, retry budget—is versioned and auditable.
 
-### Run it locally
+### Run it locally (One-Shot)
 
+The easiest way to start the complete environment (Backend + Frontend) is with the provided script:
+
+```bash
+chmod +x dev.sh
+./dev.sh
+```
+
+This will:
+1.  Create and activate a Python virtual environment (`.venv311`)
+2.  Install all backend dependencies
+3.  Install frontend dependencies
+4.  Start the FastAPI backend (port 8000)
+5.  Start the Vite frontend (port 5173) and open it in your browser
+
+### Manual Startup
+
+If you prefer to run services individually:
+
+**Backend:**
 ```bash
 python3.11 -m venv .venv311
 source .venv311/bin/activate
-pip install --upgrade pip
 pip install -e .
-
-# ensure `OPENAI_API_KEY` (and optional `RESEARCH_MODEL`) are set or defined in `.env`
-uvicorn ssr_service.api:app --host 0.0.0.0 --port 8000
+uvicorn ssr_service.api:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-
-
-### Modern Web UI (Recommended)
-
-We now provide a sleek, modern web interface built with React and Tailwind CSS:
-
+**Frontend:**
 ```bash
-# Start the backend API
-uvicorn ssr_service.api:app --host 0.0.0.0 --port 8000
-
-# In another terminal, start the web UI
 cd web_ui
-npm install  # First time only
+npm install
 npm run dev
 ```
 
-Then navigate to `http://localhost:5173` to use the interface. The web UI supports:
-- Multi-model provider selection (OpenAI, Anthropic, Gemini, Perplexity)
-- Real-time simulation results
-- Interactive charts and persona breakdowns
-- Responsive design for mobile and desktop
+### New Features
 
-See `web_ui/README.md` for more details.
+#### 1. Audience Builder
+Generate a representative synthetic panel from your own real-world data.
+-   Navigate to the **Population** tab.
+-   Select **Build Audience from Files**.
+-   Upload **CSV** (survey data), **PDF** (demographic reports), **JSON**, or **Text** files.
+-   The system uses an LLM to analyze the evidence and synthesize a `PopulationSpec` that mirrors your real audience segments.
+
+#### 2. Run History & Persistence
+Every simulation is now automatically saved to a local database.
+-   Click **Show History** in the results panel to view past runs.
+-   **Server History**: Persistent storage of all your experiments.
+-   Reload any past run to compare results or export data.
 
 ### Example request
 
@@ -114,6 +128,7 @@ The response includes:
 - Aggregate distribution weighted by persona weights.
 - Metadata describing the prompt, anchor bank, and bootstrap CIs for the average score.
 - Persona summaries that highlight the segment backgrounds powering the simulation.
+- `metadata.run_id`: The unique ID of the persisted run.
 
 ### Anatomy of the repo
 

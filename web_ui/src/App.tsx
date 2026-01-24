@@ -20,18 +20,25 @@ import {
   Copy,
   History,
   Trash2,
-  ChevronDown,
-  ChevronUp,
+  Upload,
+  FileText,
+  RefreshCw,
 } from 'lucide-react';
 import {
   listPersonaGroups,
   previewPanel,
   runSimulation,
+  listRuns,
+  getRunById,
+  deleteRunById,
+  buildAudience,
   type PanelPreviewResponse,
   type PersonaGroupSummary,
   type QuestionSpec,
   type SimulationRequest,
   type SimulationResponse,
+  type RunSummary,
+  type AudienceBuildResponse,
 } from './api';
 
 type RunRecord = {
@@ -102,10 +109,21 @@ function App() {
   const [baselineRunId, setBaselineRunId] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
-  
+
+  // Backend History State
+  const [backendRuns, setBackendRuns] = useState<RunSummary[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
+  // Audience Builder State
+  const [audienceFiles, setAudienceFiles] = useState<File[]>([]);
+  const [audienceDescription, setAudienceDescription] = useState('');
+  const [audienceBuilding, setAudienceBuilding] = useState(false);
+  const [audienceResult, setAudienceResult] = useState<AudienceBuildResponse | null>(null);
+
   // UX State
   const resultsRef = useRef<HTMLDivElement>(null);
-  const [expandedPersonas, setExpandedPersonas] = useState<Record<string, boolean>>({});
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
 
   // Load draft config
   useEffect(() => {
@@ -252,35 +270,35 @@ function App() {
       population_spec:
         populationMode === 'generate'
           ? {
+            generations: [
+              {
+                prompt: populationDescription,
+                count: 4,
+                strategy: 'openai',
+              },
+            ],
+          }
+          : useBoost
+            ? {
+              base_group: personaGroup,
               generations: [
                 {
-                  prompt: populationDescription,
-                  count: 4,
-                  strategy: 'openai',
+                  prompt: trimmedBoostPrompt,
+                  count: safeBoostCount,
+                  strategy: boostStrategy,
+                  weight_share: safeBoostShare,
                 },
               ],
             }
-          : useBoost
-            ? {
-                base_group: personaGroup,
-                generations: [
-                  {
-                    prompt: trimmedBoostPrompt,
-                    count: safeBoostCount,
-                    strategy: boostStrategy,
-                    weight_share: safeBoostShare,
-                  },
-                ],
-              }
-          : undefined,
+            : undefined,
       questionnaire: cleanedQuestionnaire.length > 0 ? cleanedQuestionnaire : undefined,
       panel_context:
         panelContextText.trim().length > 0 && panelContextChunksPerPersona > 0
           ? {
-              text: panelContextText,
-              mode: panelContextMode,
-              chunks_per_persona: panelContextChunksPerPersona,
-            }
+            text: panelContextText,
+            mode: panelContextMode,
+            chunks_per_persona: panelContextChunksPerPersona,
+          }
           : undefined,
       options: {
         n: sampleSize,
@@ -368,6 +386,78 @@ function App() {
       setError(err instanceof Error ? err.message : 'Preview failed');
     } finally {
       setPreviewing(false);
+    }
+  };
+
+  // Backend History Handlers
+  const loadBackendHistory = useCallback(async () => {
+    setLoadingHistory(true);
+    try {
+      const runs = await listRuns(20);
+      setBackendRuns(runs);
+    } catch (err) {
+      console.error('Failed to load history:', err);
+    } finally {
+      setLoadingHistory(false);
+    }
+  }, []);
+
+  const handleLoadBackendRun = async (runId: string) => {
+    try {
+      const detail = await getRunById(runId);
+      setResult(detail.response);
+      setCurrentRunId(runId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load run');
+    }
+  };
+
+  const handleDeleteBackendRun = async (runId: string) => {
+    try {
+      await deleteRunById(runId);
+      setBackendRuns((prev) => prev.filter((r) => r.id !== runId));
+      if (currentRunId === runId) {
+        setResult(null);
+        setCurrentRunId(null);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete run');
+    }
+  };
+
+  // Load backend history on mount/when history panel opens
+  useEffect(() => {
+    if (showHistory) {
+      loadBackendHistory();
+    }
+  }, [showHistory, loadBackendHistory]);
+
+  // Audience Builder Handlers
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (files) {
+      setAudienceFiles(Array.from(files));
+    }
+  };
+
+  const handleBuildAudience = async () => {
+    if (audienceFiles.length === 0) {
+      setError('Please select at least one file');
+      return;
+    }
+
+    setAudienceBuilding(true);
+    setError(null);
+
+    try {
+      const result = await buildAudience(audienceFiles, audienceDescription || undefined);
+      setAudienceResult(result);
+      // Switch to library mode - the generated spec is stored in audienceResult
+      setPopulationMode('library');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to build audience');
+    } finally {
+      setAudienceBuilding(false);
     }
   };
 
@@ -540,14 +630,14 @@ function App() {
 
     const spec = req.population_spec as
       | {
-          base_group?: unknown;
-          generations?: Array<{
-            prompt?: unknown;
-            count?: unknown;
-            strategy?: unknown;
-            weight_share?: unknown;
-          }>;
-        }
+        base_group?: unknown;
+        generations?: Array<{
+          prompt?: unknown;
+          count?: unknown;
+          strategy?: unknown;
+          weight_share?: unknown;
+        }>;
+      }
       | undefined;
 
     if (spec && typeof spec === 'object' && 'base_group' in spec) {
@@ -760,7 +850,7 @@ function App() {
   };
 
   return (
-    <div 
+    <div
       className="min-h-screen bg-slate-50 text-slate-900 font-sans"
       onKeyDown={(e) => {
         if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
@@ -980,6 +1070,83 @@ function App() {
                               ? `${selectedGroup.description || 'Library group'}`
                               : 'Pre-defined demographic groups from the library.'}
                         </p>
+                      </div>
+
+                      {/* Audience Builder Section */}
+                      <div className="p-4 rounded-lg border border-dashed border-indigo-300 bg-indigo-50/50">
+                        <div className="flex items-center gap-2 mb-3">
+                          <Upload className="w-4 h-4 text-indigo-600" />
+                          <h4 className="text-sm font-medium text-indigo-700">Build Audience from Files</h4>
+                        </div>
+                        <p className="text-xs text-slate-600 mb-3">
+                          Upload CSV, PDF, or text files with audience data. We'll generate a representative panel from your evidence.
+                        </p>
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          multiple
+                          accept=".csv,.json,.pdf,.txt"
+                          onChange={handleFileSelect}
+                          className="hidden"
+                          id="audience-files"
+                        />
+                        <div className="flex gap-2 flex-wrap mb-3">
+                          <label
+                            htmlFor="audience-files"
+                            className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg border border-indigo-200 bg-white text-indigo-600 hover:bg-indigo-50 cursor-pointer transition-colors"
+                          >
+                            <FileText className="w-4 h-4" />
+                            {audienceFiles.length > 0 ? `${audienceFiles.length} files selected` : 'Choose Files'}
+                          </label>
+                          {audienceFiles.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setAudienceFiles([])}
+                              className="px-3 py-2 text-sm text-slate-500 hover:text-slate-700"
+                            >
+                              Clear
+                            </button>
+                          )}
+                        </div>
+                        {audienceFiles.length > 0 && (
+                          <div className="text-xs text-slate-500 mb-3">
+                            {audienceFiles.map((f) => f.name).join(', ')}
+                          </div>
+                        )}
+                        <textarea
+                          placeholder="Optional: Describe your target audience (e.g., 'Health-conscious moms in urban areas')"
+                          value={audienceDescription}
+                          onChange={(e) => setAudienceDescription(e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-sm mb-3"
+                          rows={2}
+                        />
+                        <button
+                          type="button"
+                          onClick={handleBuildAudience}
+                          disabled={audienceBuilding || audienceFiles.length === 0}
+                          className="w-full py-2 px-4 rounded-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                        >
+                          {audienceBuilding ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                              Building Audience...
+                            </>
+                          ) : (
+                            <>
+                              <Users className="w-4 h-4" />
+                              Build Audience
+                            </>
+                          )}
+                        </button>
+                        {audienceResult && (
+                          <div className="mt-3 p-3 rounded-lg bg-green-50 border border-green-200">
+                            <div className="flex items-center gap-2 text-green-700 text-sm font-medium mb-2">
+                              <CheckCircle2 className="w-4 h-4" />
+                              Audience Generated
+                            </div>
+                            <p className="text-xs text-slate-600">{audienceResult.reasoning}</p>
+                          </div>
+                        )}
                       </div>
 
                       <div className="p-3 rounded-lg border border-slate-200 bg-slate-50">
@@ -1593,6 +1760,54 @@ function App() {
                           </div>
                         );
                       })}
+                  </div>
+                )}
+
+                {/* Backend History (Server-stored runs) */}
+                {showHistory && backendRuns.length > 0 && (
+                  <div className="mt-5 pt-5 border-t border-slate-100 space-y-2">
+                    <div className="flex items-center gap-2 mb-2">
+                      <History className="w-4 h-4 text-slate-500" />
+                      <span className="text-sm font-medium text-slate-600">Server History</span>
+                      <button
+                        type="button"
+                        onClick={() => loadBackendHistory()}
+                        className="ml-auto p-1 text-slate-400 hover:text-slate-600"
+                        title="Refresh"
+                      >
+                        <RefreshCw className={`w-3 h-3 ${loadingHistory ? 'animate-spin' : ''}`} />
+                      </button>
+                    </div>
+                    {backendRuns.map((run) => {
+                      const isCurrent = run.id === currentRunId;
+                      return (
+                        <div
+                          key={run.id}
+                          className={`flex items-center justify-between gap-3 p-3 rounded-lg border ${isCurrent ? 'border-indigo-200 bg-indigo-50/40' : 'border-slate-200 bg-white'}`}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => handleLoadBackendRun(run.id)}
+                            className="text-left flex-1"
+                          >
+                            <p className="text-sm font-medium text-slate-800">
+                              {run.label || 'Untitled Run'}
+                            </p>
+                            <p className="text-xs text-slate-500">
+                              {new Date(run.created_at).toLocaleString()}
+                            </p>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteBackendRun(run.id)}
+                            className="p-2 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                            aria-label="Delete run"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
