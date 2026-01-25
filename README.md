@@ -83,18 +83,24 @@ npm run dev
 
 ### New Features
 
-#### 1. Audience Builder
-Generate a representative synthetic panel from your own real-world data.
--   Navigate to the **Population** tab.
--   Select **Build Audience from Files**.
--   Upload **CSV** (survey data), **PDF** (demographic reports), **JSON**, or **Text** files.
--   The system uses an LLM to analyze the evidence and synthesize a `PopulationSpec` that mirrors your real audience segments.
+#### 1. Wizard Mode (Guided Setup)
+A step-by-step interface to guide you through creating a simulation. Perfect for first-time users.
+![Wizard Concept](docs/images/01_wizard_concept.png)
 
-#### 2. Run History & Persistence
-Every simulation is now automatically saved to a local database.
--   Click **Show History** in the results panel to view past runs.
--   **Server History**: Persistent storage of all your experiments.
--   Reload any past run to compare results or export data.
+#### 2. Audience Builder
+Generate a representative synthetic panel from your own real-world data.
+-   Navigate to the **Audience** step.
+-   Select **Generate AI Panel** or **Load Saved Group**.
+-   The system uses an LLM to analyze your description or uploaded evidence to synthesize a `PopulationSpec`.
+![Wizard Audience](docs/images/02_wizard_audience.png)
+
+#### 3. Survey Design & CSV Import
+Clearly define your questions. You can now import questions directly from a CSV file.
+![Wizard Survey](docs/images/03_wizard_survey.png)
+
+#### 4. Run History & Persistence
+Every simulation is automatically saved. Toggle the "History" icon in the dashboard to access past runs.
+![Dashboard View](docs/images/04_dashboard_view.png)
 
 ### Example request
 
