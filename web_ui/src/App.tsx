@@ -876,6 +876,13 @@ function App() {
               <div className="w-2 h-2 rounded-full bg-green-500"></div>
               System Online
             </span>
+            <button
+              onClick={() => setShowHistory((prev) => !prev)}
+              className={`p-2 rounded-lg transition-colors ${showHistory ? 'bg-indigo-100 text-indigo-700' : 'hover:bg-slate-100 text-slate-500'}`}
+              title={showHistory ? 'Hide Run History' : 'Show Run History'}
+            >
+              <History className="w-5 h-5" />
+            </button>
           </div>
         </div>
       </header>
@@ -1476,6 +1483,116 @@ function App() {
             </div>
           )}
 
+
+          {(showHistory) && (
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+              <div className="flex items-center gap-2 mb-4 pb-4 border-b border-slate-100">
+                <History className="w-5 h-5 text-indigo-600" />
+                <h3 className="font-semibold text-slate-800">Run History</h3>
+              </div>
+
+              <div className="space-y-6">
+                {/* Local History */}
+                {runHistory.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Session</span>
+                    </div>
+                    {runHistory
+                      .slice()
+                      .reverse()
+                      .map((item) => {
+                        const isCurrent = item.id === currentRunId;
+                        return (
+                          <div
+                            key={item.id}
+                            className={`flex items-center justify-between gap-3 p-3 rounded-lg border ${isCurrent ? 'border-indigo-200 bg-indigo-50/40' : 'border-slate-200 bg-white'}`}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => loadRun(item.id)}
+                              className="text-left flex-1"
+                            >
+                              <p className="text-sm font-medium text-slate-800">
+                                {item.label}
+                              </p>
+                              <p className="text-xs text-slate-500">
+                                {formatTimestamp(item.createdAt)}
+                              </p>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => deleteRun(item.id)}
+                              className="p-2 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                              aria-label="Delete run"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        );
+                      })}
+                  </div>
+                )}
+
+                {/* Backend History */}
+                {backendRuns.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Server</span>
+                      <button
+                        type="button"
+                        onClick={() => loadBackendHistory()}
+                        className="ml-auto p-1 text-slate-400 hover:text-slate-600"
+                        title="Refresh"
+                      >
+                        <RefreshCw className={`w-3 h-3 ${loadingHistory ? 'animate-spin' : ''}`} />
+                      </button>
+                    </div>
+                    {backendRuns.map((run) => {
+                      const isCurrent = run.id === currentRunId;
+                      return (
+                        <div
+                          key={run.id}
+                          className={`flex items-center justify-between gap-3 p-3 rounded-lg border ${isCurrent ? 'border-indigo-200 bg-indigo-50/40' : 'border-slate-200 bg-white'}`}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => handleLoadBackendRun(run.id)}
+                            className="text-left flex-1"
+                          >
+                            <p className="text-sm font-medium text-slate-800">
+                              {run.label || 'Untitled Run'}
+                            </p>
+                            <p className="text-xs text-slate-500">
+                              {new Date(run.created_at).toLocaleString()}
+                            </p>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteBackendRun(run.id)}
+                            className="p-2 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                            aria-label="Delete run"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Empty State */}
+                {runHistory.length === 0 && backendRuns.length === 0 && (
+                  <div className="text-center py-12 bg-slate-50 rounded-lg border border-slate-100 border-dashed">
+                    <History className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+                    <p className="text-sm text-slate-500 font-medium">No runs found</p>
+                    <p className="text-xs text-slate-400 mt-1">Start a simulation to create history.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {panelPreview && !loading && (
             <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
               <div className="flex items-center justify-between mb-4">
@@ -1663,15 +1780,8 @@ function App() {
                       </button>
                     )}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowHistory((prev) => !prev)}
-                    className="px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 text-sm font-medium flex items-center gap-2"
-                  >
-                    <History className="w-4 h-4" />
-                    {showHistory ? 'Hide history' : 'Show history'}
-                  </button>
                 </div>
+
 
                 {baselineRun?.response && (
                   <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -1725,91 +1835,7 @@ function App() {
                   </div>
                 )}
 
-                {showHistory && runHistory.length > 0 && (
-                  <div className="mt-5 pt-5 border-t border-slate-100 space-y-2">
-                    {runHistory
-                      .slice()
-                      .reverse()
-                      .map((item) => {
-                        const isCurrent = item.id === currentRunId;
-                        return (
-                          <div
-                            key={item.id}
-                            className={`flex items-center justify-between gap-3 p-3 rounded-lg border ${isCurrent ? 'border-indigo-200 bg-indigo-50/40' : 'border-slate-200 bg-white'}`}
-                          >
-                            <button
-                              type="button"
-                              onClick={() => loadRun(item.id)}
-                              className="text-left flex-1"
-                            >
-                              <p className="text-sm font-medium text-slate-800">
-                                {item.label}
-                              </p>
-                              <p className="text-xs text-slate-500">
-                                {formatTimestamp(item.createdAt)}
-                              </p>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => deleteRun(item.id)}
-                              className="p-2 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                              aria-label="Delete run"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        );
-                      })}
-                  </div>
-                )}
 
-                {/* Backend History (Server-stored runs) */}
-                {showHistory && backendRuns.length > 0 && (
-                  <div className="mt-5 pt-5 border-t border-slate-100 space-y-2">
-                    <div className="flex items-center gap-2 mb-2">
-                      <History className="w-4 h-4 text-slate-500" />
-                      <span className="text-sm font-medium text-slate-600">Server History</span>
-                      <button
-                        type="button"
-                        onClick={() => loadBackendHistory()}
-                        className="ml-auto p-1 text-slate-400 hover:text-slate-600"
-                        title="Refresh"
-                      >
-                        <RefreshCw className={`w-3 h-3 ${loadingHistory ? 'animate-spin' : ''}`} />
-                      </button>
-                    </div>
-                    {backendRuns.map((run) => {
-                      const isCurrent = run.id === currentRunId;
-                      return (
-                        <div
-                          key={run.id}
-                          className={`flex items-center justify-between gap-3 p-3 rounded-lg border ${isCurrent ? 'border-indigo-200 bg-indigo-50/40' : 'border-slate-200 bg-white'}`}
-                        >
-                          <button
-                            type="button"
-                            onClick={() => handleLoadBackendRun(run.id)}
-                            className="text-left flex-1"
-                          >
-                            <p className="text-sm font-medium text-slate-800">
-                              {run.label || 'Untitled Run'}
-                            </p>
-                            <p className="text-xs text-slate-500">
-                              {new Date(run.created_at).toLocaleString()}
-                            </p>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteBackendRun(run.id)}
-                            className="p-2 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-                            aria-label="Delete run"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
               </div>
 
               {/* Top Stats */}
@@ -1967,8 +1993,8 @@ function App() {
             </>
           )}
         </div>
-      </main>
-    </div>
+      </main >
+    </div >
   );
 }
 
