@@ -15,6 +15,7 @@ A modern, responsive web interface for the Synthetic Consumer Research Service.
 
 - Node.js 18+ and npm
 - The backend API server running on `http://localhost:8000`
+- Optional: set `VITE_API_URL` if your backend is not on `http://localhost:8000`
 
 ### Installation
 
@@ -39,6 +40,15 @@ npm run build
 npm run preview  # Preview the production build
 ```
 
+## Render Deployment
+
+The root repository includes `/render.yaml` with a free-tier Render blueprint:
+
+- backend web service (`llm-consumer-research-api`)
+- static frontend (`llm-consumer-research-ui`)
+
+`VITE_API_URL` is wired from the backend Render URL automatically.
+
 ## How to Use
 
 1. **Start the Backend**: Make sure the FastAPI backend is running:
@@ -62,7 +72,7 @@ npm run preview  # Preview the production build
 
 ## Architecture
 
-- **React 18** with TypeScript
+- **React 19** with TypeScript
 - **Vite** for blazing-fast builds
 - **Tailwind CSS** for styling
 - **Recharts** for data visualization

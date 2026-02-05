@@ -10,10 +10,10 @@ import json
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 from sqlalchemy import Column, DateTime, String, Text, create_engine, desc
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.orm import Session, declarative_base, sessionmaker
 
 from .config import get_settings
 
@@ -42,13 +42,15 @@ class RunRecord(Base):
 
     def to_full_dict(self) -> Dict[str, Any]:
         result = self.to_dict()
-        result["request"] = json.loads(self.request_json) if self.request_json else None
-        result["response"] = json.loads(self.response_json) if self.response_json else None
+        request_json = cast(Optional[str], self.request_json)
+        response_json = cast(Optional[str], self.response_json)
+        result["request"] = json.loads(request_json) if request_json else None
+        result["response"] = json.loads(response_json) if response_json else None
         return result
 
 
 _engine = None
-_Session = None
+_Session: sessionmaker | None = None
 
 
 def get_db_path() -> Path:
@@ -68,11 +70,13 @@ def init_db() -> None:
     _Session = sessionmaker(bind=_engine)
 
 
-def get_session():
+def get_session() -> Session:
     """Get a database session."""
     global _Session
     if _Session is None:
         init_db()
+    if _Session is None:  # pragma: no cover - defensive guard
+        raise RuntimeError("Database session factory failed to initialize")
     return _Session()
 
 

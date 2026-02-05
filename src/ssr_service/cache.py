@@ -1,4 +1,4 @@
-"""Cache for OpenAI API calls."""
+"""In-memory cache for LLM API calls."""
 
 from __future__ import annotations
 
@@ -8,18 +8,19 @@ from typing import Dict, Optional
 _CACHE: Dict[str, str] = {}
 
 
-def get_from_cache(prompt: str) -> Optional[str]:
+def get_from_cache(prompt: str, *, namespace: str = "") -> Optional[str]:
     """Get a response from the cache."""
-    key = _get_key(prompt)
+    key = _get_key(prompt, namespace=namespace)
     return _CACHE.get(key)
 
 
-def add_to_cache(prompt: str, response: str) -> None:
+def add_to_cache(prompt: str, response: str, *, namespace: str = "") -> None:
     """Add a response to the cache."""
-    key = _get_key(prompt)
+    key = _get_key(prompt, namespace=namespace)
     _CACHE[key] = response
 
 
-def _get_key(prompt: str) -> str:
+def _get_key(prompt: str, *, namespace: str = "") -> str:
     """Get the cache key for a prompt."""
-    return hashlib.sha256(prompt.encode()).hexdigest()
+    payload = f"{namespace}\n{prompt}" if namespace else prompt
+    return hashlib.sha256(payload.encode()).hexdigest()

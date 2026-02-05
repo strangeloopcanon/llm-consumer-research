@@ -50,10 +50,11 @@ class ElicitationClient:
             f"Question: {question}\n"
             "Return only the JSON object."
         )
+        cache_namespace = f"elicitation:{self._model}"
 
         from .cache import add_to_cache, get_from_cache
 
-        cached_response = get_from_cache(prompt)
+        cached_response = get_from_cache(prompt, namespace=cache_namespace)
         if cached_response:
             return ElicitationResult(rationale=cached_response, used_model="cached")
 
@@ -78,7 +79,7 @@ class ElicitationClient:
             except json.JSONDecodeError:
                 rationale = raw_text
 
-        add_to_cache(prompt, rationale)
+        add_to_cache(prompt, rationale, namespace=cache_namespace)
         return ElicitationResult(rationale=rationale, used_model=response.model)
 
 

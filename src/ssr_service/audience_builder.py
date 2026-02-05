@@ -8,6 +8,7 @@ This module provides:
 from __future__ import annotations
 
 import csv
+import importlib
 import io
 import json
 import logging
@@ -79,9 +80,12 @@ def _summarize_text(content: str, filename: str, max_chars: int = 5000) -> str:
 def _summarize_pdf(content: bytes, filename: str) -> str:
     """Extract text from PDF bytes. Requires pdfplumber or falls back gracefully."""
     try:
-        import pdfplumber
+        pdfplumber = importlib.import_module("pdfplumber")
+        open_pdf = getattr(pdfplumber, "open", None)
+        if open_pdf is None:  # pragma: no cover - runtime guard
+            raise ImportError("pdfplumber.open is unavailable")
 
-        with pdfplumber.open(io.BytesIO(content)) as pdf:
+        with open_pdf(io.BytesIO(content)) as pdf:
             text_parts = []
             for i, page in enumerate(pdf.pages[:10]):  # Limit to first 10 pages
                 page_text = page.extract_text() or ""
@@ -198,16 +202,21 @@ async def synthesize_panel(
 
     user_prompt = "\n\n".join(user_prompt_parts)
 
+    if not settings.openai_api_key:
+        raise ValueError("OPENAI_API_KEY is required for audience synthesis")
+
+    base_url = str(settings.openai_base_url) if settings.openai_base_url else None
+
     # Use the provider's underlying client to make a structured call
     try:
-        from openai import OpenAI
+        from openai import AsyncOpenAI
 
-        client = OpenAI(
-            api_key=settings.openai_api_key.get_secret_value() if settings.openai_api_key else None,
-            base_url=settings.openai_base_url or None,
+        client = AsyncOpenAI(
+            api_key=settings.openai_api_key,
+            base_url=base_url,
         )
 
-        response = client.chat.completions.create(
+        response = await client.chat.completions.create(
             model=settings.openai_responses_model,
             messages=[
                 {"role": "system", "content": SYNTHESIS_SYSTEM_PROMPT},
@@ -222,7 +231,7 @@ async def synthesize_panel(
         parsed = json.loads(raw_json)
 
     except Exception as e:
-        logger.error("Failed to synthesize panel: %s", e)
+        logger.exception("audience_panel_synthesis_failed")
         raise ValueError(f"Panel synthesis failed: {e}") from e
 
     # Parse the response into a PopulationSpec

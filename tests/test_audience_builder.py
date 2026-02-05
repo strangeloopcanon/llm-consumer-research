@@ -2,7 +2,13 @@
 
 from __future__ import annotations
 
-from ssr_service.audience_builder import parse_evidence
+import json
+from types import SimpleNamespace
+
+import pytest
+
+from ssr_service.audience_builder import parse_evidence, synthesize_panel
+from ssr_service.config import AppSettings
 
 
 class TestParseEvidence:
@@ -81,3 +87,55 @@ Carol,45,Low,US"""
         result = parse_evidence([("bad.json", "not valid json {")])
 
         assert "Failed to parse JSON" in result
+
+
+@pytest.mark.asyncio
+async def test_synthesize_panel_uses_async_openai(monkeypatch):
+    class DummyCompletions:
+        async def create(self, **kwargs):  # noqa: ANN003
+            _ = kwargs
+            payload = {
+                "injections": [
+                    {
+                        "persona": {
+                            "name": "Thailand Urban Parents",
+                            "region": "TH",
+                            "descriptors": ["family shoppers"],
+                            "weight": 1.0,
+                        },
+                        "weight_share": 1.0,
+                    }
+                ],
+                "reasoning": "Evidence points to Thai urban family households.",
+            }
+            return SimpleNamespace(
+                choices=[
+                    SimpleNamespace(
+                        message=SimpleNamespace(content=json.dumps(payload))
+                    )
+                ]
+            )
+
+    class DummyClient:
+        def __init__(self, **kwargs):  # noqa: ANN003
+            _ = kwargs
+            self.chat = SimpleNamespace(completions=DummyCompletions())
+
+    monkeypatch.setattr("openai.AsyncOpenAI", DummyClient)
+
+    settings = AppSettings(openai_api_key="dummy-key")
+    spec, reasoning = await synthesize_panel(
+        evidence_summary="Survey transcript",
+        settings=settings,
+    )
+
+    assert spec.injections
+    assert spec.injections[0].persona.region == "TH"
+    assert "Thai" in reasoning
+
+
+@pytest.mark.asyncio
+async def test_synthesize_panel_requires_openai_api_key():
+    settings = AppSettings(openai_api_key=None)
+    with pytest.raises(ValueError):
+        await synthesize_panel("evidence", settings=settings)

@@ -1,0 +1,41 @@
+services:
+  - type: web
+    name: llm-consumer-research-api
+    runtime: python
+    plan: free
+    buildCommand: pip install --upgrade pip && pip install -e .
+    startCommand: uvicorn ssr_service.api:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.6
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: GOOGLE_API_KEY
+        sync: false
+      - key: PERPLEXITY_API_KEY
+        sync: false
+      - key: CORS_ALLOW_ORIGINS
+        fromService:
+          type: web
+          name: llm-consumer-research-ui
+          envVarKey: RENDER_EXTERNAL_URL
+
+  - type: web
+    name: llm-consumer-research-ui
+    runtime: static
+    plan: free
+    buildCommand: cd web_ui && npm ci && npm run build
+    staticPublishPath: web_ui/dist
+    envVars:
+      - key: VITE_API_URL
+        fromService:
+          type: web
+          name: llm-consumer-research-api
+          envVarKey: RENDER_EXTERNAL_URL
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
