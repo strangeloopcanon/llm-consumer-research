@@ -26,7 +26,6 @@ services:
   - type: web
     name: llm-consumer-research-ui
     runtime: static
-    plan: free
     buildCommand: cd web_ui && npm ci && npm run build
     staticPublishPath: web_ui/dist
     envVars:
