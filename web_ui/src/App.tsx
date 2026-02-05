@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState, useRef } from 'react';
 import {
   LayoutDashboard,
-  Users,
   Zap,
 } from 'lucide-react';
 import {
@@ -15,6 +14,7 @@ import {
   type PanelPreviewResponse,
   type PersonaGroupSummary,
   type QuestionSpec,
+  type PopulationSpecPayload,
   type SimulationRequest,
   type SimulationResponse,
   type RunSummary,
@@ -27,6 +27,9 @@ import { DashboardView } from './components/DashboardView';
 const RUN_STORAGE_KEY = 'ssr_run_history_v1';
 const DRAFT_STORAGE_KEY = 'ssr_draft_config_v1';
 const MAX_RUN_HISTORY = 20;
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
 
 function App() {
   // Form State
@@ -80,7 +83,7 @@ function App() {
   const [runHistory, setRunHistory] = useState<RunRecord[]>([]);
   const [currentRunId, setCurrentRunId] = useState<string | null>(null);
   const [baselineRunId, setBaselineRunId] = useState<string | null>(null);
-  const [showHistory, setShowHistory] = useState(false);
+  const showHistory = true;
 
   // Backend History State
   const [backendRuns, setBackendRuns] = useState<RunSummary[]>([]);
@@ -255,26 +258,39 @@ function App() {
     const safeBoostCount = Number.isFinite(boostCount) ? Math.max(boostCount, 1) : 2;
     const useBoost =
       populationMode === 'library' && boostEnabled && trimmedBoostPrompt.length > 0;
+    const hasAudiencePopulation =
+      populationMode === 'library' &&
+      !useBoost &&
+      Boolean(audienceResult?.population_spec);
+
+    let populationSpec: PopulationSpecPayload | undefined;
+    if (populationMode === 'generate') {
+      populationSpec = {
+        generations: [{ prompt: populationDescription, count: 4, strategy: 'openai' }],
+      };
+    } else if (useBoost) {
+      populationSpec = {
+        base_group: personaGroup,
+        generations: [
+          {
+            prompt: trimmedBoostPrompt,
+            count: safeBoostCount,
+            strategy: boostStrategy,
+            weight_share: safeBoostShare,
+          },
+        ],
+      };
+    } else if (hasAudiencePopulation) {
+      populationSpec = audienceResult?.population_spec;
+    }
 
     return {
       concept: { title, text: description, price },
-      persona_group: populationMode === 'library' && !useBoost ? personaGroup : undefined,
-      population_spec:
-        populationMode === 'generate'
-          ? { generations: [{ prompt: populationDescription, count: 4, strategy: 'openai' }] }
-          : useBoost
-            ? {
-              base_group: personaGroup,
-              generations: [
-                {
-                  prompt: trimmedBoostPrompt,
-                  count: safeBoostCount,
-                  strategy: boostStrategy,
-                  weight_share: safeBoostShare,
-                },
-              ],
-            }
-            : undefined,
+      persona_group:
+        populationMode === 'library' && !useBoost && !hasAudiencePopulation
+          ? personaGroup
+          : undefined,
+      population_spec: populationSpec,
       questionnaire: cleanedQuestionnaire.length > 0 ? cleanedQuestionnaire : undefined,
       panel_context:
         panelContextText.trim().length > 0 && panelContextChunksPerPersona > 0
@@ -298,7 +314,7 @@ function App() {
     additionalInstructions, boostCount, boostEnabled, boostPrompt, boostShare, boostStrategy,
     description, includeRespondents, panelContextChunksPerPersona, panelContextMode, panelContextText,
     panelSeed, personaGroup, populationDescription, populationMode, price, providers, questionnaire,
-    sampleSize, temperature, title,
+    sampleSize, temperature, title, audienceResult,
   ]);
 
   const handleSimulate = async () => {
@@ -310,13 +326,19 @@ function App() {
     try {
       const response = await runSimulation(payload);
       setResult(response);
-      const runId = typeof crypto !== 'undefined' && 'randomUUID' in crypto
-        ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+      const runId = typeof response.metadata?.run_id === 'string'
+        ? response.metadata.run_id
+        : (typeof crypto !== 'undefined' && 'randomUUID' in crypto
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(16).slice(2)}`);
 
       const labelParts: string[] = [];
       if (title.trim()) labelParts.push(title.trim());
-      labelParts.push(populationMode === 'library' ? personaGroup : 'generated audience');
+      if (payload.population_spec && !payload.persona_group) {
+        labelParts.push('custom audience');
+      } else {
+        labelParts.push(populationMode === 'library' ? personaGroup : 'generated audience');
+      }
       labelParts.push(`n=${sampleSize}`);
       if (panelSeed > 0) labelParts.push(`seed=${panelSeed}`);
 
@@ -386,10 +408,8 @@ function App() {
   };
 
   useEffect(() => {
-    if (showHistory) {
-      loadBackendHistory();
-    }
-  }, [showHistory, loadBackendHistory]);
+    loadBackendHistory();
+  }, [loadBackendHistory]);
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -468,21 +488,26 @@ function App() {
       setPanelContextChunksPerPersona(3);
     }
 
-    const spec = req.population_spec as any;
+    const spec = req.population_spec;
+    setAudienceResult(null);
 
-    if (spec && typeof spec === 'object' && 'base_group' in spec) {
+    if (isRecord(spec) && 'base_group' in spec) {
       const baseGroup = typeof spec.base_group === 'string' ? spec.base_group : '';
       setPopulationMode('library');
       if (baseGroup) setPersonaGroup(baseGroup);
 
       const generation = Array.isArray(spec.generations) ? spec.generations[0] : undefined;
-      const prompt = generation && typeof generation.prompt === 'string' ? generation.prompt : '';
+      const generationObj = isRecord(generation) ? generation : null;
+      const prompt = generationObj && typeof generationObj.prompt === 'string' ? generationObj.prompt : '';
       const share =
-        generation && typeof generation.weight_share === 'number' ? generation.weight_share : 0.3;
-      const count = generation && typeof generation.count === 'number' ? generation.count : 2;
+        generationObj && typeof generationObj.weight_share === 'number'
+          ? generationObj.weight_share
+          : 0.3;
+      const count = generationObj && typeof generationObj.count === 'number' ? generationObj.count : 2;
       const strategy =
-        generation && (generation.strategy === 'heuristic' || generation.strategy === 'openai')
-          ? generation.strategy
+        generationObj &&
+          (generationObj.strategy === 'heuristic' || generationObj.strategy === 'openai')
+          ? generationObj.strategy
           : 'openai';
 
       setBoostEnabled(Boolean(prompt));
@@ -494,9 +519,12 @@ function App() {
       return;
     }
 
-    if (spec && typeof spec === 'object' && Array.isArray((spec as { generations?: unknown }).generations)) {
-      const generations = (spec as { generations?: Array<{ prompt?: unknown }> }).generations ?? [];
-      const prompt = typeof generations[0]?.prompt === 'string' ? generations[0]?.prompt : '';
+    if (isRecord(spec) && Array.isArray(spec.generations) && !('base_group' in spec)) {
+      const firstGeneration = isRecord(spec.generations[0]) ? spec.generations[0] : null;
+      const prompt =
+        firstGeneration && typeof firstGeneration.prompt === 'string'
+          ? firstGeneration.prompt
+          : '';
       setPopulationMode('generate');
       setPopulationDescription(prompt);
       setBoostEnabled(false);
@@ -504,6 +532,22 @@ function App() {
       setBoostShare(0.3);
       setBoostCount(2);
       setBoostStrategy('openai');
+      return;
+    }
+
+    if (isRecord(spec)) {
+      setPopulationMode('library');
+      setAudienceResult({
+        population_spec: spec,
+        reasoning: 'Loaded from run history.',
+        evidence_summary_length: 0,
+      });
+      setBoostEnabled(false);
+      setBoostPrompt('');
+      setBoostShare(0.3);
+      setBoostCount(2);
+      setBoostStrategy('openai');
+      setPopulationDescription('');
       return;
     }
 
@@ -552,7 +596,6 @@ function App() {
       <main className="max-w-7xl mx-auto px-4 py-8">
         {viewMode === 'wizard' ? (
           <WizardView
-            viewMode={viewMode}
             setViewMode={setViewMode}
             wizardStep={wizardStep}
             setWizardStep={setWizardStep}

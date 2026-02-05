@@ -81,6 +81,30 @@ npm install
 npm run dev
 ```
 
+### Deploy On Render (Free Tier)
+
+This repo includes a Render Blueprint at `/render.yaml` that deploys both:
+
+- `llm-consumer-research-api` (FastAPI web service)
+- `llm-consumer-research-ui` (static Vite site)
+
+The blueprint wires:
+
+- `VITE_API_URL` (frontend) from the backend service URL
+- `CORS_ALLOW_ORIGINS` (backend) from the frontend service URL
+
+#### Steps
+
+1. Push this repo to GitHub.
+2. In Render, choose **New +** → **Blueprint** and select the repo.
+3. Review both services (they default to `plan: free`).
+4. Set secret env vars for whichever providers you use (for example `OPENAI_API_KEY`).
+5. Deploy.
+
+After deploy, open the `llm-consumer-research-ui` Render URL.
+
+> Free-tier note: web services can spin down after inactivity and have monthly usage limits.
+
 ### New Features
 
 #### 1. Wizard Mode (Guided Setup)
@@ -163,6 +187,9 @@ The response includes:
 - `OPENAI_EMBEDDING_MODEL` – embedding model (default `text-embedding-3-small`).
 - `ANCHOR_BANK_PATH` – directory containing anchor YAML files.
 - `PERSONA_LIBRARY_PATH` – directory containing persona library YAML files.
+- `CORS_ALLOW_ORIGINS` – optional comma-separated list of allowed browser origins (defaults to local Vite origins).
+
+Anchor-bank locale is inferred from request content (concept copy, questions, and population criteria). Thai-language/Thailand signals select Thai anchor banks when available, otherwise the service falls back to English anchors.
 
 All settings are loaded via `pydantic-settings`; `.env` in the repo root is respected.
 

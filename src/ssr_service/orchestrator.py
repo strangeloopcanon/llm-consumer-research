@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import asyncio
+import re
 from collections import Counter
+from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
@@ -50,6 +52,27 @@ DEFAULT_ANCHOR_BANK_BY_INTENT: Dict[str, str] = {
     "differentiation": "differentiation_en.yml",
 }
 
+LOCALE_ANCHOR_BANK_BY_INTENT: Dict[str, Dict[str, str]] = {
+    "th-TH": {
+        "purchase_intent": "purchase_intent_th.yml",
+        "relevance": "purchase_intent_th.yml",
+        "trust": "trust_th.yml",
+        "clarity": "clarity_th.yml",
+        "value_for_money": "value_for_money_th.yml",
+        "differentiation": "differentiation_th.yml",
+    }
+}
+
+_THAI_CHAR_RE = re.compile(r"[\u0E00-\u0E7F]")
+_THAI_WORD_RE = re.compile(r"[\u0E00-\u0E7F]{2,}")
+_THAI_KEYWORDS = {
+    "thailand",
+    "thai",
+    "bangkok",
+    "chiang mai",
+    "phuket",
+}
+
 
 def _default_question(intent: str) -> str:
     lookup = {
@@ -68,8 +91,10 @@ def _clean_rationale(text: str) -> str:
 
 
 def _top_themes(rationales: List[str], limit: int = 3) -> List[str]:
-    tokens = []
+    tokens: List[str] = []
     for text in rationales:
+        for thai_word in _THAI_WORD_RE.findall(text):
+            tokens.append(thai_word)
         for word in text.lower().split():
             word = word.strip(".,!?()")
             if len(word) <= 3 or not word.isalpha():
@@ -77,6 +102,81 @@ def _top_themes(rationales: List[str], limit: int = 3) -> List[str]:
             tokens.append(word)
     counts = Counter(tokens)
     return [word for word, _ in counts.most_common(limit)]
+
+
+def _request_signal_chunks(request: SimulationRequest) -> List[str]:
+    chunks: List[str] = []
+
+    concept = request.concept
+    if concept.title:
+        chunks.append(concept.title)
+    if concept.text:
+        chunks.append(concept.text)
+    if concept.url:
+        chunks.append(str(concept.url))
+
+    if request.persona_group:
+        chunks.append(request.persona_group)
+    chunks.extend(request.questions)
+
+    for question in request.questionnaire:
+        chunks.append(question.text)
+
+    for persona in request.personas:
+        chunks.append(persona.name)
+        if persona.region:
+            chunks.append(persona.region)
+        chunks.extend(persona.descriptors)
+
+    for generation in request.persona_generations:
+        chunks.append(generation.prompt)
+        chunks.extend(f"{k}:{v}" for k, v in generation.attributes.items())
+
+    for persona_filter in request.persona_filters:
+        if persona_filter.group:
+            chunks.append(persona_filter.group)
+        for values in persona_filter.include.values():
+            chunks.extend(values)
+        for values in persona_filter.exclude.values():
+            chunks.extend(values)
+        chunks.extend(persona_filter.keywords)
+
+    if request.population_spec:
+        spec = request.population_spec
+        if spec.base_group:
+            chunks.append(spec.base_group)
+        for generation in spec.generations:
+            chunks.append(generation.prompt)
+            chunks.extend(f"{k}:{v}" for k, v in generation.attributes.items())
+        for persona_filter in spec.filters:
+            if persona_filter.group:
+                chunks.append(persona_filter.group)
+            for values in persona_filter.include.values():
+                chunks.extend(values)
+            for values in persona_filter.exclude.values():
+                chunks.extend(values)
+            chunks.extend(persona_filter.keywords)
+        for injection in spec.injections:
+            chunks.append(injection.persona.name)
+            if injection.persona.region:
+                chunks.append(injection.persona.region)
+            chunks.extend(injection.persona.descriptors)
+
+    return [chunk for chunk in chunks if chunk]
+
+
+def _infer_locale_from_request(request: SimulationRequest) -> str:
+    chunks = _request_signal_chunks(request)
+    if any(_THAI_CHAR_RE.search(chunk) for chunk in chunks):
+        return "th-TH"
+    if any(chunk.strip().upper() == "TH" for chunk in chunks):
+        return "th-TH"
+
+    lowered = " ".join(chunks).lower()
+    if any(keyword in lowered for keyword in _THAI_KEYWORDS):
+        return "th-TH"
+
+    return "en-US"
 
 
 def _bootstrap_ci(
@@ -315,12 +415,33 @@ def _allocate_draws(
     return base.tolist()
 
 
-def _default_anchor_bank(intent: str, fallback: str) -> str:
-    return DEFAULT_ANCHOR_BANK_BY_INTENT.get(intent, fallback)
+def _anchor_exists(anchor_bank: str, settings: AppSettings) -> bool:
+    candidate = Path(anchor_bank)
+    if candidate.is_absolute():
+        return candidate.exists()
+    return (Path(settings.anchor_bank_path) / anchor_bank).exists()
+
+
+def _default_anchor_bank(
+    intent: str, fallback: str, locale: str, settings: AppSettings
+) -> str:
+    locale_overrides = LOCALE_ANCHOR_BANK_BY_INTENT.get(locale, {})
+    locale_anchor = locale_overrides.get(intent)
+    if locale_anchor and _anchor_exists(locale_anchor, settings):
+        return locale_anchor
+
+    default_anchor = DEFAULT_ANCHOR_BANK_BY_INTENT.get(intent, fallback)
+    if _anchor_exists(default_anchor, settings):
+        return default_anchor
+    return fallback
 
 
 def _build_question_specs(
-    request: SimulationRequest, options: SimulationOptions
+    request: SimulationRequest,
+    options: SimulationOptions,
+    *,
+    locale: str,
+    settings: AppSettings,
 ) -> List[QuestionSpec]:
     base_intent = request.intent or options.intent
     base_question = (
@@ -328,7 +449,12 @@ def _build_question_specs(
         or options.intent_question
         or _default_question(base_intent)
     )
-    base_anchor = options.anchor_bank or DEFAULT_ANCHOR_BANK_BY_INTENT["purchase_intent"]
+    base_anchor = options.anchor_bank or _default_anchor_bank(
+        base_intent,
+        DEFAULT_ANCHOR_BANK_BY_INTENT["purchase_intent"],
+        locale,
+        settings,
+    )
 
     specs: List[QuestionSpec] = []
     for spec in request.questionnaire:
@@ -343,12 +469,14 @@ def _build_question_specs(
                 id="q1",
                 text=base_question.strip(),
                 intent=base_intent,
-                anchor_bank=_default_anchor_bank(base_intent, base_anchor),
+                anchor_bank=_default_anchor_bank(base_intent, base_anchor, locale, settings),
             )
         )
 
     default_intent = specs[0].intent or base_intent
-    default_anchor = specs[0].anchor_bank or _default_anchor_bank(default_intent, base_anchor)
+    default_anchor = specs[0].anchor_bank or _default_anchor_bank(
+        default_intent, base_anchor, locale, settings
+    )
 
     raw_questions = [q.strip() for q in request.questions if q and q.strip()]
     for q in raw_questions:
@@ -360,7 +488,9 @@ def _build_question_specs(
         if not spec.intent:
             spec.intent = default_intent
         if not spec.anchor_bank:
-            spec.anchor_bank = _default_anchor_bank(spec.intent, default_anchor)
+            spec.anchor_bank = _default_anchor_bank(
+                spec.intent, default_anchor, locale, settings
+            )
 
     return specs
 
@@ -485,6 +615,7 @@ async def _assemble_panel(
 async def preview_panel(request: SimulationRequest) -> PanelPreviewResponse:
     settings = get_settings()
     persona_group = request.persona_group
+    locale = _infer_locale_from_request(request)
 
     if request.sample_id:
         sample = load_sample(request.sample_id)
@@ -492,7 +623,9 @@ async def preview_panel(request: SimulationRequest) -> PanelPreviewResponse:
         if not request.intent_question and sample.intent_question:
             request = request.model_copy(update={"intent_question": sample.intent_question})
 
-    question_specs = _build_question_specs(request, request.options)
+    question_specs = _build_question_specs(
+        request, request.options, locale=locale, settings=settings
+    )
     personas, draw_counts, _, metadata, _ = await _assemble_panel(
         request=request,
         persona_group=persona_group,
@@ -504,12 +637,14 @@ async def preview_panel(request: SimulationRequest) -> PanelPreviewResponse:
         PanelAllocation(persona=persona, draws=draws)
         for persona, draws in zip(personas, draw_counts)
     ]
+    metadata["locale_detected"] = locale
 
     return PanelPreviewResponse(panel=panel, questions=question_specs, metadata=metadata)
 
 
 async def run_simulation(request: SimulationRequest) -> SimulationResponse:
     settings = get_settings()
+    locale = _infer_locale_from_request(request)
 
     concept_input = request.concept
     persona_group = request.persona_group
@@ -535,7 +670,9 @@ async def run_simulation(request: SimulationRequest) -> SimulationResponse:
     providers = [get_provider(name, model_override=options.model) for name in provider_names]
 
     artifact = await ingest_concept(concept_input)
-    question_specs = _build_question_specs(request, options)
+    question_specs = _build_question_specs(
+        request, options, locale=locale, settings=settings
+    )
     personas, draw_counts, persona_group_source, panel_metadata, raking_applied = await _assemble_panel(
         request=request,
         persona_group=persona_group,
@@ -667,6 +804,10 @@ async def run_simulation(request: SimulationRequest) -> SimulationResponse:
     ci_lower, ci_upper = question_ci_bounds[0]
 
     first_spec = question_specs[0]
+    provider_model_pairs = [
+        f"{provider.provider_name}={getattr(provider, 'default_model', 'unknown')}"
+        for provider in providers
+    ]
     metadata: Dict[str, str] = {
         "question": first_spec.text,
         "anchor_bank": first_spec.anchor_bank or "",
@@ -679,6 +820,11 @@ async def run_simulation(request: SimulationRequest) -> SimulationResponse:
         "persona_total": str(len(personas)),
         "question_count": str(len(question_specs)),
         "providers": ",".join(p.provider_name for p in providers),
+        "provider_models": ",".join(provider_model_pairs),
+        "model": str(getattr(providers[0], "default_model", "unknown"))
+        if providers
+        else "",
+        "locale_detected": locale,
     }
     metadata.update(panel_metadata)
 

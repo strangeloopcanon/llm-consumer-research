@@ -30,7 +30,6 @@ import type {
     RunSummary,
     PanelPreviewResponse,
     AudienceBuildResponse,
-    SimulationRequest
 } from '../api';
 import type { RunRecord, QuestionAggregate } from '../types';
 import type { ChangeEvent } from 'react';
@@ -72,7 +71,7 @@ export interface DashboardViewProps {
     audienceResult: AudienceBuildResponse | null;
     handleBuildAudience: () => void;
     handleFileSelect: (e: ChangeEvent<HTMLInputElement>) => void;
-    fileInputRef: React.RefObject<HTMLInputElement>;
+    fileInputRef: React.RefObject<HTMLInputElement | null>;
 
     // Advanced - Boost
     boostEnabled: boolean;
@@ -166,7 +165,9 @@ export function DashboardView(props: DashboardViewProps) {
                 await navigator.clipboard.writeText(text);
                 return true;
             }
-        } catch { } // Fallback
+        } catch {
+            // Fall back to the textarea copy path below.
+        }
         try {
             const textarea = document.createElement('textarea');
             textarea.value = text;
@@ -273,17 +274,9 @@ export function DashboardView(props: DashboardViewProps) {
         [personaGroups, personaGroup]
     );
 
-    const providersForActiveRun = useMemo(() => {
-        const opts = currentRun?.request?.options as any;
-        return Array.isArray(opts?.providers) ? opts.providers : [];
-    }, [currentRun]);
+    const providersForActiveRun = currentRun?.request?.options.providers ?? [];
 
-    const observedProviderModels = useMemo(() => {
-        if (!activeResult?.metadata?.provider_models) return null;
-        return Object.entries(activeResult.metadata.provider_models)
-            .map(([provider, model]) => `${provider}=${model}`)
-            .join(', ');
-    }, [activeResult]);
+    const observedProviderModels = activeResult?.metadata?.provider_models ?? null;
 
     const intentLabel = useMemo(() => {
         if (!activeResult?.questions) return 'Purchase Intent';
@@ -301,32 +294,27 @@ export function DashboardView(props: DashboardViewProps) {
     }, [activeResult]);
 
     // Baseline Comparison Logic
-    const baselineRun = useMemo(() =>
-        runHistory.find(r => r.id === baselineRunId),
-        [runHistory, baselineRunId]
-    );
+    const baselineRun = runHistory.find(r => r.id === baselineRunId);
 
     const formatTimestamp = (ts: number) => new Date(ts).toLocaleString();
 
     const questionAggregatesFor = (res: SimulationResponse) =>
         res.questions || [];
 
-    const baselineAggregateMap = useMemo(() => {
-        const map = new Map<string, QuestionAggregate>();
-        if (!baselineRun?.response?.questions) return map;
+    const baselineAggregateMap = new Map<string, QuestionAggregate>();
+    if (baselineRun?.response?.questions) {
         for (const q of baselineRun.response.questions) {
-            map.set(q.question_id, q);
+            baselineAggregateMap.set(q.question_id, q);
         }
-        return map;
-    }, [baselineRun]);
+    }
 
-    const overallDeltas = useMemo(() => {
-        if (!activeResult || !baselineRun?.response) return null;
-        return {
-            meanDelta: activeResult.aggregate.mean - baselineRun.response.aggregate.mean,
-            top2Delta: activeResult.aggregate.top2box - baselineRun.response.aggregate.top2box
-        };
-    }, [activeResult, baselineRun]);
+    const overallDeltas =
+        activeResult && baselineRun?.response
+            ? {
+                meanDelta: activeResult.aggregate.mean - baselineRun.response.aggregate.mean,
+                top2Delta: activeResult.aggregate.top2box - baselineRun.response.aggregate.top2box,
+            }
+            : null;
 
     const toneForDelta = (delta: number | null | undefined) => {
         if (delta === null || delta === undefined) return 'bg-white border-slate-200';

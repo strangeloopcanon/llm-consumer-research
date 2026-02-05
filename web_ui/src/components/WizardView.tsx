@@ -4,7 +4,6 @@ import type { ChangeEvent } from 'react';
 
 // Define props for WizardView
 export interface WizardViewProps {
-    viewMode: 'dashboard' | 'wizard';
     setViewMode: (mode: 'dashboard' | 'wizard') => void;
     wizardStep: number;
     setWizardStep: (step: number | ((prev: number) => number)) => void;
@@ -33,7 +32,6 @@ export interface WizardViewProps {
 }
 
 export function WizardView({
-    viewMode,
     setViewMode,
     wizardStep,
     setWizardStep,

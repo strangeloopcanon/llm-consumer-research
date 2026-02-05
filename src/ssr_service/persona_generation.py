@@ -12,9 +12,22 @@ from openai import AsyncOpenAI
 from .config import AppSettings
 from .models import PersonaGenerationTask, PersonaSpec
 
+_THAI_CHAR_RE = re.compile(r"[\u0E00-\u0E7F]")
+_THAI_WORD_RE = re.compile(r"[\u0E00-\u0E7F]{2,}")
+
 
 def _extract_keywords(text: str, limit: int = 6) -> List[str]:
-    words = re.findall(r"[A-Za-z][A-Za-z\-']{2,}", text.lower())
+    raw_text = text.strip()
+    if not raw_text:
+        return []
+
+    if _THAI_CHAR_RE.search(raw_text):
+        words = _THAI_WORD_RE.findall(raw_text)
+    else:
+        words = re.findall(
+            r"[^\W\d_][^\W\d_'\-]{2,}", raw_text.lower(), flags=re.UNICODE
+        )
+
     deduped: List[str] = []
     for word in words:
         if word in deduped:
@@ -25,7 +38,7 @@ def _extract_keywords(text: str, limit: int = 6) -> List[str]:
 
 def _fallback_name(prompt: str, index: int) -> str:
     base = prompt.strip() or "Generated Persona"
-    base = re.sub(r"[^A-Za-z0-9 ]+", "", base).strip()
+    base = re.sub(r"[^\w\s]+", "", base, flags=re.UNICODE).replace("_", " ").strip()
     base = base.title()[:40] or "Generated Persona"
     return f"{base} #{index + 1}"
 

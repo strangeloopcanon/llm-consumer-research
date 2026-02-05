@@ -58,8 +58,9 @@ class OpenAIProvider(LLMProvider):
             prompt += f"Response ID: {seed}\n"
 
         prompt += "Return only the JSON object."
+        cache_namespace = f"{self.provider_name}:{self._model}"
 
-        cached_response = get_from_cache(prompt)
+        cached_response = get_from_cache(prompt, namespace=cache_namespace)
         if cached_response:
             return LLMResponse(
                 rationale=cached_response,
@@ -86,7 +87,7 @@ class OpenAIProvider(LLMProvider):
         except json.JSONDecodeError:
             rationale = raw_text
 
-        add_to_cache(prompt, rationale)
+        add_to_cache(prompt, rationale, namespace=cache_namespace)
         return LLMResponse(
             rationale=rationale,
             provider=self.provider_name,

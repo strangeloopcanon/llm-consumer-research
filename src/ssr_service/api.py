@@ -35,9 +35,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app_settings = get_settings()
+
 app.add_middleware(
     CORSMiddleware,  # ty: ignore[invalid-argument-type]
-    allow_origins=["*"],  # For development convenience
+    allow_origins=app_settings.cors_allow_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

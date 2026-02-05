@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:8000';
+const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8000';
 
 export interface ConceptInput {
     title?: string;
@@ -34,12 +34,14 @@ export interface PanelContextSpec {
     chunks_per_persona?: number;
 }
 
+export type PopulationSpecPayload = Record<string, unknown>;
+
 export interface SimulationRequest {
     concept: ConceptInput;
     persona_group?: string;
     questionnaire?: QuestionSpec[];
     questions?: string[];
-    population_spec?: unknown;
+    population_spec?: PopulationSpecPayload;
     panel_context?: PanelContextSpec;
     options: SimulationOptions;
 }
@@ -183,7 +185,7 @@ export const deleteRunById = async (runId: string): Promise<void> => {
 // ============================================================================
 
 export interface AudienceBuildResponse {
-    population_spec: unknown;
+    population_spec: PopulationSpecPayload;
     reasoning: string;
     evidence_summary_length: number;
 }

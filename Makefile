@@ -7,7 +7,7 @@ PIP := $(PYTHON) -m pip
 RUFF := $(VENV)/bin/ruff
 TY := $(VENV)/bin/ty
 PYTEST := $(VENV)/bin/pytest
-BANDIT := $(VENV)/bin/bandit
+BANDIT := $(PYTHON) -m bandit
 PIP_AUDIT := $(VENV)/bin/pip-audit
 PIP_AUDIT_FLAGS ?= --ignore-vuln GHSA-4xh5-x5gv-qwph
 
